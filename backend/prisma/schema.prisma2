@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VehicleStatus {
+  EN SERVICE
+  EN REPARATION
+  HORS SERVICE
+}
+
+enum insurancesType {
+  Tiers
+  Intermédiaire
+  Tous Risques
+}
+
+enum FuelType {
+  DIESEL
+  SUPER
+  LUBRIFIANT
+  HUILE
+}
+
+enum UserRole {
+  ADMIN
+  FLEET_MANAGER
+  FUEL_OPERATOR
+  VIEWER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(VIEWER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FuelType {
+ id        String   @id @default(cuid())
+ name      String 
+}
+
+model Driver {
+  id        String   @id @default(cuid())
+  fullName  String
+  birthDate DateTime?
+  phone     String?
+  licenseNo String?
+  typeLicence String?
+  endDateLicence DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fuelDispenses FuelDispense[]
+  assignments    VehicleAssignment[]
+}
+
+model Vehicle {
+  id             String        @id @default(cuid())
+  plate          String        @unique
+  make           String?
+  model          String?
+  fuelType       FuelType
+  commissioningDate DateTime?
+  chassisNumber String        @unique
+  odometerKm     Int           @default(0)
+  status         VehicleStatus @default(IN_SERVICE)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  assignments    VehicleAssignment[]
+  fuelDispenses  FuelDispense[]
+  maintenances   Maintenance[]
+  insurances     InsurancePolicy[]
+  inspections    Inspection[]
+}
+
+model VehicleAssignment {
+  id        String   @id @default(cuid())
+  vehicleId String
+  driverId  String
+  startDate DateTime @default(now())
+  endDate   DateTime?
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  driver  Driver  @relation(fields: [driverId], references: [id])
+
+  @@index([vehicleId])
+  @@index([driverId])
+}
+
+model Station {
+  id        String   @id @default(cuid())
+  name      String
+  location  String?
+  address String?
+  phone String?
+  openingDate DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tanks     Tank[]
+  supplies  FuelSupply[]
+  dispenses FuelDispense[]
+}
+
+model Tank {
+  id         String   @id @default(cuid())
+  stationId  String
+  fuelType   FuelType
+  capacityL  Int
+  currentL   Int      @default(0)
+  lowAlertL  Int      @default(100)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  station    Station  @relation(fields: [stationId], references: [id])
+  supplies   FuelSupply[]
+  dispenses  FuelDispense[]
+
+  @@unique([stationId, fuelType])
+  @@index([stationId])
+}
+
+model FuelSupply {
+  id          String   @id @default(cuid())
+  stationId   String
+  tankId      String
+  supplier    String?
+  deliveredL  Int
+  unitPrice   Float?
+  deliveryRef String?
+  deliveredAt DateTime @default(now())
+  notes       String?
+
+  station Station @relation(fields: [stationId], references: [id])
+  tank    Tank    @relation(fields: [tankId], references: [id])
+
+  @@index([stationId])
+  @@index([tankId])
+}
+
+model FuelDispense {
+  id          String   @id @default(cuid())
+  stationId   String
+  tankId      String
+  vehicleId   String
+  driverId    String?
+  liters      Int
+  unitPrice   Float?
+  odometerKm  Int
+  dispensedAt DateTime @default(now())
+  notes       String?
+
+  station Station @relation(fields: [stationId], references: [id])
+  tank    Tank    @relation(fields: [tankId], references: [id])
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  driver  Driver? @relation(fields: [driverId], references: [id])
+
+  @@index([stationId])
+  @@index([tankId])
+  @@index([vehicleId])
+}
+
+model Maintenance {
+  id          String   @id @default(cuid())
+  vehicleId   String?
+  type        String?
+  description String?
+  cost        Float? 
+  odometerKm  Int
+  dueAt       DateTime?
+  doneAt      DateTime?
+  status      String   @default("PLANNED") // PLANNED | DONE
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId])
+}
+model Insurer {
+  id          String   @id @default(cuid())
+  name   String?
+  location    String?
+  address String?
+  phone1    String?
+  phone2     String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InsurancePolicy {
+  id          String   @id @default(cuid())
+  vehicleId   String?
+  insurer     String?
+  insurancesType String?
+  policyNo    String?
+  startAt     DateTime?
+  endAt       DateTime?
+  premium     Float?
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId])
+}
+
+model Inspection {
+  id          String   @id @default(cuid())
+  vehicleId   String
+  type        String   @default("VISITE_TECHNIQUE")
+  scheduledAt DateTime
+  doneAt      DateTime?
+  result      String?  // PASS | FAIL
+  center      String?
+  cost        Float?
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId])
+}

@@ -1,0 +1,56 @@
+$colors: (
+  'primary': #3b82f6,
+  'primary-dark': #2563eb,
+  'primary-light': #60a5fa,
+  'secondary': #8b5cf6,
+  'success': #10b981,
+  'warning': #f59e0b,
+  'danger': #ef4444,
+  'info': #06b6d4,
+  
+  'gray-50': #f9fafb,
+  'gray-100': #f3f4f6,
+  'gray-200': #e5e7eb,
+  'gray-300': #d1d5db,
+  'gray-400': #9ca3af,
+  'gray-500': #6b7280,
+  'gray-600': #4b5563,
+  'gray-700': #374151,
+  'gray-800': #1f2937,
+  'gray-900': #111827,
+  
+  'background': #0a0a14,
+  'surface': rgba(15, 23, 42, 0.8),
+  'surface-light': rgba(30, 41, 59, 0.5)
+);
+
+// Breakpoints
+$breakpoints: (
+  'xs': 0,
+  'sm': 640px,
+  'md': 768px,
+  'lg': 1024px,
+  'xl': 1280px,
+  '2xl': 1536px
+);
+
+// Typographie
+$font-family-sans: 'Inter', sans-serif;
+$font-family-display: 'Outfit', sans-serif;
+
+// Z-index
+$z-index: (
+  'background': 1,
+  'content': 10,
+  'dropdown': 20,
+  'modal': 30,
+  'tooltip': 40
+);
+
+// Animations
+$animations: (
+  'duration-fast': 0.2s,
+  'duration-normal': 0.3s,
+  'duration-slow': 0.5s,
+  'easing': cubic-bezier(0.4, 0, 0.2, 1)
+);
