@@ -170,6 +170,40 @@ export const useAuthStore = defineStore("auth", () => {
     }
   };
 
+  const updateProfile = async (payload) => {
+    if (!token.value) {
+      return { success: false, error: "Utilisateur non authentifié" };
+    }
+
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await authApi.put("/auth/me", payload || {}, {
+        headers: {
+          Authorization: `Bearer ${token.value}`,
+        },
+      });
+
+      const responseData = response.data || {};
+      const nextUser = responseData.user;
+      const nextToken = responseData.token || token.value;
+
+      if (!nextUser) {
+        throw new Error("Réponse invalide du serveur");
+      }
+
+      setAuth(nextToken, nextUser);
+      return { success: true, user: nextUser, message: responseData.message || "Profil mis à jour" };
+    } catch (err) {
+      const message = err?.response?.data?.message || "Erreur lors de la mise à jour du profil";
+      error.value = message;
+      return { success: false, error: message };
+    } finally {
+      loading.value = false;
+    }
+  };
+
   const logout = () => {
     clearAuth();
     if (window.location.pathname !== "/login") {
@@ -211,6 +245,7 @@ export const useAuthStore = defineStore("auth", () => {
     isViewer,
     initialize,
     login,
+    updateProfile,
     logout,
     setAuth,
     setSession,

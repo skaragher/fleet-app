@@ -15,19 +15,67 @@
             <div class="row">
               <div class="field flex-2">
                 <label>Véhicule (En Service)</label>
-                <select v-model="form.vehicleId" @change="handleVehicleChange" class="custom-input">
+                <input
+                  v-model.trim="vehicleSearchTerm"
+                  type="text"
+                  class="custom-input mb-8"
+                  placeholder="Rechercher par matricule..."
+                />
+                <select
+                  v-model="form.vehicleId"
+                  @change="handleVehicleChange"
+                  class="custom-input"
+                  :disabled="form.isPrivateVehicle"
+                >
                   <option value="" disabled>Choisir véhicule...</option>
-                  <option v-for="v in activeVehicles" :key="v.id" :value="v.id">
-                    {{ v.plate }} [{{ v.fuelType }}]
+                  <option v-for="v in filteredActiveVehicles" :key="v.id" :value="v.id">
+                    {{ v.plate }} [{{ v.fuelType }}] {{ v.model ? `- ${v.model}` : '' }}
                   </option>
                 </select>
+                <label class="private-toggle">
+                  <input type="checkbox" v-model="form.isPrivateVehicle" @change="handlePrivateToggle" />
+                  Véhicule privé (non enregistré)
+                </label>
+                <div v-if="form.isPrivateVehicle" class="private-vehicle-box">
+                  <input
+                    v-model.trim="form.privatePlate"
+                    type="text"
+                    class="custom-input mb-8"
+                    placeholder="Matricule (ex: AB-123-CD)"
+                  />
+                  <div class="row">
+                    <div class="field flex-1">
+                      <input
+                        v-model.trim="form.privateMake"
+                        type="text"
+                        class="custom-input"
+                        placeholder="Marque (optionnel)"
+                      />
+                    </div>
+                    <div class="field flex-1">
+                      <input
+                        v-model.trim="form.privateModel"
+                        type="text"
+                        class="custom-input"
+                        placeholder="Modèle (optionnel)"
+                      />
+                    </div>
+                  </div>
+                  <select v-model="form.privateFuelType" class="custom-input mt-10">
+                    <option value="" disabled>Type carburant du véhicule privé</option>
+                    <option value="DIESEL">DIESEL</option>
+                    <option value="SUPER">SUPER</option>
+                    <option value="LUBRIFIANT">LUBRIFIANT</option>
+                    <option value="HUILE">HUILE</option>
+                  </select>
+                </div>
               </div>
               <div class="field flex-2">
                 <label>Source (Cuve)</label>
-                <select v-model="form.tankId" :disabled="!form.vehicleId" class="custom-input highlight-tank">
+                <select v-model="form.tankId" :disabled="!selectedFuelType" class="custom-input highlight-tank">
                   <option value="" disabled>Sélectionner la cuve</option>
                   <optgroup v-for="s in filteredStations" :key="s.id" :label="s.name">
-                    <option v-for="t in s.tanks.filter(tk => tk.fuelType === selectedVehicle?.fuelType)" :key="t.id" :value="t.id">
+                    <option v-for="t in s.tanks.filter(tk => tk.fuelType === selectedFuelType)" :key="t.id" :value="t.id">
                       {{ t.fuelType }} ({{ t.currentL }}L dispo)
                     </option>
                   </optgroup>
@@ -371,6 +419,7 @@ const isEditing = ref(false);
 const editingId = ref(null);
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
+const vehicleSearchTerm = ref("");
 
 // États des modales
 const showDeleteModal = ref(false);
@@ -402,18 +451,31 @@ const initialForm = {
   tankId: "", 
   liters: 0, 
   unitPrice: 0, 
-  odometerKm: 0 
+  odometerKm: 0,
+  isPrivateVehicle: false,
+  privatePlate: "",
+  privateMake: "",
+  privateModel: "",
+  privateFuelType: ""
 };
 const form = ref({ ...initialForm });
 
 // Computed properties
 const activeVehicles = computed(() => vehicles.value.filter(v => v.status === 'EN_SERVICE'));
+const filteredActiveVehicles = computed(() => {
+  const q = vehicleSearchTerm.value.trim().toLowerCase();
+  if (!q) return activeVehicles.value;
+  return activeVehicles.value.filter((v) => String(v.plate || "").toLowerCase().includes(q));
+});
 const selectedVehicle = computed(() => vehicles.value.find(v => v.id === form.value.vehicleId));
 const isDriverAssigned = computed(() => !!(selectedVehicle.value?.driverId));
+const selectedFuelType = computed(() =>
+  form.value.isPrivateVehicle ? form.value.privateFuelType || "" : selectedVehicle.value?.fuelType || ""
+);
 
 const filteredStations = computed(() => {
-  if (!selectedVehicle.value) return [];
-  return stations.value.filter(s => s.tanks?.some(t => t.fuelType === selectedVehicle.value.fuelType));
+  if (!selectedFuelType.value) return [];
+  return stations.value.filter(s => s.tanks?.some(t => t.fuelType === selectedFuelType.value));
 });
 
 const searchActive = computed(() => {
@@ -646,13 +708,27 @@ function handleVehicleChange() {
   }
 }
 
+function handlePrivateToggle() {
+  form.value.tankId = "";
+  if (form.value.isPrivateVehicle) {
+    form.value.vehicleId = "";
+    form.value.driverId = "";
+    form.value.odometerKm = form.value.odometerKm || 0;
+  } else {
+    form.value.privatePlate = "";
+    form.value.privateMake = "";
+    form.value.privateModel = "";
+    form.value.privateFuelType = "";
+  }
+}
+
 async function load() {
   try {
     console.log("Chargement des données...");
     
     const [stationsRes, vehiclesRes, driversRes, dispensesRes] = await Promise.all([
       api.get("/stations"),
-      api.get("/vehicles"),
+      api.get("/fuel/dispenses/vehicles-catalog"),
       api.get("/drivers"),
       api.get("/fuel/dispenses")
     ]);
@@ -691,8 +767,16 @@ async function processSubmit() {
   // Validation
   validationErrors.value = [];
   
-  if (!form.value.vehicleId) {
+  if (!form.value.isPrivateVehicle && !form.value.vehicleId) {
     validationErrors.value.push("Véhicule requis");
+  }
+
+  if (form.value.isPrivateVehicle && !form.value.privatePlate) {
+    validationErrors.value.push("Matricule du véhicule privé requis");
+  }
+
+  if (form.value.isPrivateVehicle && !form.value.privateFuelType) {
+    validationErrors.value.push("Type carburant du véhicule privé requis");
   }
   
   if (!form.value.tankId) {
@@ -703,7 +787,7 @@ async function processSubmit() {
     validationErrors.value.push("Volume doit être supérieur à 0");
   }
   
-  if (selectedVehicle.value && form.value.odometerKm < selectedVehicle.value.odometerKm) {
+  if (!form.value.isPrivateVehicle && selectedVehicle.value && form.value.odometerKm < selectedVehicle.value.odometerKm) {
     validationErrors.value.push(`L'index saisi (${form.value.odometerKm}) est inférieur au dernier index (${selectedVehicle.value.odometerKm}) du véhicule`);
   }
   
@@ -718,7 +802,7 @@ async function processSubmit() {
     
     // Préparer le payload
     const payload = { 
-      vehicleId: String(form.value.vehicleId),
+      vehicleId: form.value.isPrivateVehicle ? null : String(form.value.vehicleId),
       driverId: form.value.driverId || null,
       tankId: String(form.value.tankId),
       stationId: tank?.stationId ? String(tank.stationId) : null,
@@ -726,6 +810,15 @@ async function processSubmit() {
       unitPrice: form.value.unitPrice ? Number(form.value.unitPrice) : null,
       odometerKm: form.value.odometerKm ? Number(form.value.odometerKm) : null
     };
+
+    if (form.value.isPrivateVehicle) {
+      payload.privateVehicle = {
+        plate: String(form.value.privatePlate || "").trim().toUpperCase(),
+        fuelType: form.value.privateFuelType,
+        make: form.value.privateMake || null,
+        model: form.value.privateModel || null,
+      };
+    }
     
     let response;
     const montantTotal = (form.value.liters * (form.value.unitPrice || 0)).toLocaleString();
@@ -886,12 +979,28 @@ onMounted(load);
 .row { display: flex; flex-direction: column; gap: 15px; }
 .mt-30 { margin-top: 25px; }
 .mb-20 { margin-bottom: 20px; }
+.mb-8 { margin-bottom: 8px; }
 .mt-20 { margin-top: 20px; }
 .mt-25 { margin-top: 25px; }
 .mt-10 { margin-top: 10px; }
 
 .field { display: flex; flex-direction: column; gap: 5px; width: 100%; }
 .field label { font-size: 12px; font-weight: 600; color: #64748b; }
+.private-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #334155;
+}
+.private-vehicle-box {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
 .info-km { color: #3b82f6; font-weight: bold; }
 .custom-input { padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
 .total-inline { font-size: 18px; font-weight: 900; color: #1e293b; padding: 10px 0; }

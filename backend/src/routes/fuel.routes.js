@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../prisma.js";
 import { auth } from "../middleware/auth.js";
 import { parse, dispenseSchema, supplySchema } from "../validators.js";
+import { buildUserScope } from "../utils/userScope.js";
 
 const router = Router();
 
@@ -10,9 +11,18 @@ const router = Router();
 // ============================================
 
 // Liste des ravitaillements
-router.get("/dispenses", auth(), async (_req, res, next) => {
+router.get("/dispenses", auth(), async (req, res, next) => {
   try {
+    const scope = await buildUserScope(req.user);
+    const where = {};
+    if (scope.role === "DRIVER") {
+      where.vehicleId = scope.assignedVehicleId || "__none__";
+    } else if (scope.role === "STATION_MANAGER") {
+      where.stationId = { in: scope.assignedStationIds.length ? scope.assignedStationIds : ["__none__"] };
+    }
+
     const items = await prisma.fuelDispense.findMany({
+      where,
       orderBy: { dispensedAt: "desc" },
       include: { station: true, tank: true, vehicle: true, driver: true }
     });
@@ -65,9 +75,21 @@ router.post("/dispenses", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_
 // ============================================
 
 // Liste des approvisionnements
-router.get("/supplies", auth(), async (_req, res, next) => {
+router.get("/supplies", auth(), async (req, res, next) => {
   try {
+    const scope = await buildUserScope(req.user);
+    if (scope.role === "FLEET_MANAGER") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const where = {};
+    if (scope.role === "STATION_MANAGER") {
+      where.stationId = { in: scope.assignedStationIds.length ? scope.assignedStationIds : ["__none__"] };
+    } else if (scope.role === "DRIVER") {
+      where.stationId = "__none__";
+    }
+
     const items = await prisma.fuelSupply.findMany({
+      where,
       orderBy: { deliveredAt: "desc" },
       include: { 
         station: { 
@@ -83,7 +105,7 @@ router.get("/supplies", auth(), async (_req, res, next) => {
 });
 
 // Créer un nouvel approvisionnement
-router.post("/supplies", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_MANAGER"]), async (req, res, next) => {
+router.post("/supplies", auth(["SUPER_ADMIN","ADMIN","STATION_MANAGER"]), async (req, res, next) => {
   try {
     const data = parse(supplySchema, req.body);
     
@@ -141,7 +163,7 @@ router.post("/supplies", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_M
 });
 
 // Modifier un approvisionnement
-router.put("/supplies/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_MANAGER"]), async (req, res, next) => {
+router.put("/supplies/:id", auth(["SUPER_ADMIN","ADMIN","STATION_MANAGER"]), async (req, res, next) => {
   try {
     const { id } = req.params;
     const data = parse(supplySchema, req.body);
@@ -228,7 +250,7 @@ router.put("/supplies/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATIO
 });
 
 // Supprimer un approvisionnement
-router.delete("/supplies/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req, res, next) => {
+router.delete("/supplies/:id", auth(["SUPER_ADMIN","ADMIN"]), async (req, res, next) => {
   try {
     const { id } = req.params;
     

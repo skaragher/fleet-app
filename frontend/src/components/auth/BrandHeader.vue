@@ -5,7 +5,7 @@
       <div class="icon-glow"></div>
     </div>
     <div class="brand-info">
-      <h1 class="brand-title">FLOTTECH</h1>
+      <h1 class="brand-title">FLEETENERGY</h1>
       <p class="brand-subtitle">Gestion Intelligente d'Énergie Mobile</p>
     </div>
   </div>

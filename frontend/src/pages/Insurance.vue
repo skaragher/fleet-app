@@ -1,1903 +1,849 @@
 <template>
-  <div class="dashboard-container">
-    <!-- Notifications -->
-    <Transition name="fade">
-      <div v-if="error || successMessage" :class="['notification', error ? 'notification-error' : 'notification-success']">
-        <div class="noti-content">
-          <span class="status-icon">{{ error ? '⚠️' : '✅' }}</span>
-          <div class="noti-text">
-            <p class="noti-title">{{ error ? 'Erreur' : 'Succès' }}</p>
-            <p class="noti-message">{{ error || successMessage }}</p>
-          </div>
-        </div>
-        <button @click="clearMessages" class="notification-close">×</button>
-      </div>
-    </Transition>
-
-    <!-- Modal de modification -->
-    <Transition name="modal">
-      <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
-        <div class="modal-content glass-modal">
-          <div class="modal-header">
-            <div class="modal-header-icon">
-              <span>✏️</span>
-            </div>
-            <div class="modal-header-text">
-              <h3>Modifier le Contrat d'Assurance</h3>
-              <p class="modal-subtitle">POL-{{ editForm.policyNo }} • {{ getVehiclePlate(selectedItem?.vehicleId) }}</p>
-            </div>
-            <button @click="closeEditModal" class="modal-close">×</button>
-          </div>
-          
-          <div class="modal-body">
-            <div class="modal-grid">
-              <!-- Informations fixes -->
-              <div class="modal-section">
-                <h4 class="section-title">
-                  <span class="section-icon">📋</span>
-                  Informations du contrat
-                </h4>
-                <div class="fixed-info-grid">
-                  <div class="fixed-info-item">
-                    <span class="fixed-info-label">Véhicule</span>
-                    <span class="fixed-info-value highlight-bg">
-                      <span class="info-icon">🚗</span>
-                      {{ getVehiclePlate(selectedItem?.vehicleId) }}
-                    </span>
-                  </div>
-                  <div class="fixed-info-item">
-                    <span class="fixed-info-label">Créé le</span>
-                    <span class="fixed-info-value">
-                      <span class="info-icon">📅</span>
-                      {{ formatDateTime(selectedItem?.createdAt) }}
-                    </span>
-                  </div>
-                  <div class="fixed-info-item">
-                    <span class="fixed-info-label">Statut</span>
-                    <span :class="['fixed-info-value status-badge', getDaysRemainingClass(selectedItem?.endAt)]">
-                      <span class="info-icon">{{ getDaysRemainingIcon(selectedItem?.endAt) }}</span>
-                      {{ getDaysRemainingText(selectedItem?.endAt) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Champs modifiables -->
-              <div class="modal-section">
-                <h4 class="section-title">
-                  <span class="section-icon">🔄</span>
-                  Informations modifiables
-                </h4>
-                <div class="edit-form-grid">
-                  <div class="form-group">
-                    <label class="form-label">
-                      <span class="label-icon">🏢</span>
-                      Assureur *
-                    </label>
-                    <select v-model="editForm.insurerId" class="modern-input modal-input" :disabled="!canModify(selectedItem?.createdAt)">
-                      <option value="" disabled>Choisir un assureur...</option>
-                      <option v-for="ins in insurers" :key="ins.id" :value="ins.id">{{ ins.name }}</option>
-                    </select>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">
-                      <span class="label-icon">🛡️</span>
-                      Type de couverture *
-                    </label>
-                    <select v-model="editForm.insurancesType" class="modern-input modal-input" :disabled="!canModify(selectedItem?.createdAt)">
-                      <option value="RC">Responsabilité Civile (RC)</option>
-                      <option value="TIERS">Tiers Simple</option>
-                      <option value="INTERMEDIAIRE">Intermédiaire</option>
-                      <option value="TOUS_RISQUES">Tous Risques</option>
-                    </select>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">
-                      <span class="label-icon">🔢</span>
-                      N° de Police *
-                    </label>
-                    <div class="input-with-prefix">
-                      <span class="input-prefix">POL-</span>
-                      <input v-model="editForm.policyNo" type="text" class="modern-input modal-input" 
-                             :disabled="!canModify(selectedItem?.createdAt)" />
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">
-                      <span class="label-icon">💵</span>
-                      Coût annuel (FCFA) *
-                    </label>
-                    <div class="input-with-suffix">
-                      <input type="number" v-model.number="editForm.premium" class="modern-input modal-input" 
-                             :disabled="!canModify(selectedItem?.createdAt)" />
-                      <span class="input-suffix">FCFA</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Période modifiable -->
-              <div class="modal-section">
-                <h4 class="section-title">
-                  <span class="section-icon">📅</span>
-                  Période du contrat
-                </h4>
-                <div class="period-edit-grid">
-                  <div class="form-group">
-                    <label class="form-label">
-                      <span class="label-icon">⏱️</span>
-                      Durée
-                    </label>
-                    <div class="duration-input-modal">
-                      <input type="number" v-model.number="editForm.durationValue" class="modern-input num-input" min="1" 
-                             :disabled="!canModify(selectedItem?.createdAt)" />
-                      <select v-model="editForm.durationUnit" class="modern-input unit-select" 
-                              :disabled="!canModify(selectedItem?.createdAt)">
-                        <option value="months">Mois</option>
-                        <option value="years">Années</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">
-                      <span class="label-icon">📅</span>
-                      Date de début
-                    </label>
-                    <input type="date" v-model="editForm.startAt" class="modern-input modal-input"
-                           :disabled="!canModify(selectedItem?.createdAt)" @change="calculateEditEndDate" />
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">
-                      <span class="label-icon">⏰</span>
-                      Date d'échéance
-                    </label>
-                    <div class="date-display-modal">
-                      <input type="date" v-model="editForm.endAt" class="modern-input modal-input" readonly 
-                             :class="getDateFieldClass(editForm.endAt)" />
-                      <span class="date-info-small">Calculée automatiquement</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Info modification -->
-              <div class="modal-info-section">
-                <div class="modification-status-card" :class="canModify(selectedItem?.createdAt) ? 'status-active' : 'status-locked'">
-                  <div class="status-icon-large">
-                    {{ canModify(selectedItem?.createdAt) ? '✅' : '🔒' }}
-                  </div>
-                  <div class="status-content">
-                    <h4 class="status-title">{{ canModify(selectedItem?.createdAt) ? 'Modification autorisée' : 'Modification verrouillée' }}</h4>
-                    <p class="status-text">
-                      {{ canModify(selectedItem?.createdAt) 
-                        ? `Vous pouvez modifier ce contrat jusqu'au ${formatDate(getModificationDeadline(selectedItem?.createdAt))}` 
-                        : `Les modifications sont verrouillées depuis le ${formatDate(getModificationDeadline(selectedItem?.createdAt))}` }}
-                    </p>
-                    <div class="time-remaining" v-if="canModify(selectedItem?.createdAt)">
-                      <span class="time-icon">⏳</span>
-                      <span class="time-text">
-                        Temps restant : {{ getRemainingModificationTime(selectedItem?.createdAt).hours }}h 
-                        {{ getRemainingModificationTime(selectedItem?.createdAt).minutes }}min
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="modal-footer">
-            <div class="modal-footer-content">
-              <button @click="closeEditModal" class="btn-cancel">
-                <span class="btn-icon">←</span>
-                <span class="btn-text">Annuler</span>
-              </button>
-              <div class="footer-actions">
-                <button @click="updateContract" :disabled="!canModify(selectedItem?.createdAt) || updating" 
-                        class="btn-save" :class="{ 'btn-disabled': !canModify(selectedItem?.createdAt) }">
-                  <span v-if="!updating" class="btn-icon">💾</span>
-                  <span v-if="!updating" class="btn-text">Enregistrer les modifications</span>
-                  <span v-if="updating" class="loading-spinner-small"></span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- Chargement -->
-    <div v-if="loading && !items.length" class="loading-overlay">
-      <div class="loading-content">
-        <div class="loading-spinner-large"></div>
-        <p>Chargement des données...</p>
-      </div>
-    </div>
-
+  <div class="insurance">
     <!-- Header -->
-    <header class="dashboard-header">
-      <div class="header-content">
-        <div class="header-main">
-          <h1 class="title">
-            <span class="title-icon">🛡️</span>
-            Gestion des Assurances
-          </h1>
-          <p class="subtitle">Flotte Automobile • {{ today }}</p>
-        </div>
-        <div class="header-actions">
-          <button @click="load" class="refresh-btn" :class="{ rotating: loading }" :disabled="loading">
-            <span class="refresh-icon">{{ loading ? '⏳' : '🔄' }}</span>
-            <span class="refresh-text">{{ loading ? 'Chargement...' : 'Actualiser' }}</span>
-          </button>
-        </div>
+    <header class="header">
+      <div class="header-left">
+        <h1>Assurances</h1>
+        <p class="date">{{ today }}</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-outline" :disabled="loading" @click="loadData">
+          <span class="btn-icon">↻</span>
+          Actualiser
+        </button>
+        <button class="btn btn-outline" :disabled="submitting" @click="resetForm">
+          <span class="btn-icon">+</span>
+          Nouveau
+        </button>
       </div>
     </header>
 
-    <!-- KPI Grid -->
+    <!-- KPIs -->
     <div class="kpi-grid">
-      <div class="kpi-card glass premium framed-card">
+      <div class="kpi-card">
+        <div class="kpi-icon blue">📄</div>
         <div class="kpi-content">
-          <div class="kpi-icon-wrapper framed-icon">
-            <span class="kpi-icon">📄</span>
-          </div>
-          <div class="kpi-text">
-            <span class="label">Polices actives</span>
-            <h3 class="value">{{ items.length }}</h3>
-          </div>
-        </div>
-        <div class="kpi-trend">
-          <span class="trend-text">Total contrats</span>
+          <span class="kpi-label">Polices actives</span>
+          <span class="kpi-value">{{ activePolicies }}</span>
+          <span class="kpi-trend">Total contrats</span>
         </div>
       </div>
-      
-      <div class="kpi-card glass premium framed-card">
+      <div class="kpi-card">
+        <div class="kpi-icon indigo">💰</div>
         <div class="kpi-content">
-          <div class="kpi-icon-wrapper framed-icon">
-            <span class="kpi-icon">💰</span>
-          </div>
-          <div class="kpi-text">
-            <span class="label">Montant total</span>
-            <h3 class="value">{{ formatCompactCurrency(totalPremium) }}</h3>
-          </div>
-        </div>
-        <div class="kpi-trend">
-          <span class="trend-text">Somme assurée</span>
+          <span class="kpi-label">Montant total</span>
+          <span class="kpi-value">{{ compactAmount(totalPremium) }}</span>
+          <span class="kpi-trend">Somme assurée</span>
         </div>
       </div>
-      
-      <div class="kpi-card glass warning framed-card">
+      <div class="kpi-card">
+        <div class="kpi-icon orange">⏳</div>
         <div class="kpi-content">
-          <div class="kpi-icon-wrapper framed-icon">
-            <span class="kpi-icon">⏳</span>
-          </div>
-          <div class="kpi-text">
-            <span class="label">À renouveler</span>
-            <h3 class="value">{{ upcomingRenewals }}</h3>
-          </div>
-        </div>
-        <div class="kpi-trend">
-          <span class="trend-text">30 prochains jours</span>
+          <span class="kpi-label">À renouveler</span>
+          <span class="kpi-value">{{ expiringSoon }}</span>
+          <span class="kpi-trend">30 prochains jours</span>
         </div>
       </div>
-      
-      <div class="kpi-card glass danger framed-card">
+      <div class="kpi-card">
+        <div class="kpi-icon red">🚨</div>
         <div class="kpi-content">
-          <div class="kpi-icon-wrapper framed-icon">
-            <span class="kpi-icon">🚨</span>
-          </div>
-          <div class="kpi-text">
-            <span class="label">Expirées</span>
-            <h3 class="value">{{ expiredCount }}</h3>
-          </div>
-        </div>
-        <div class="kpi-trend">
-          <span class="trend-text">Action requise</span>
+          <span class="kpi-label">Expirées</span>
+          <span class="kpi-value">{{ expiredPolicies }}</span>
+          <span class="kpi-trend">Action requise</span>
         </div>
       </div>
     </div>
 
-    <!-- Formulaire de création -->
-    <section class="form-section card framed-card">
-      <div class="form-header">
-        <div class="form-header-icon framed-icon">
-          <span>📋</span>
-        </div>
-        <div class="form-header-text">
-          <h3>Nouveau Contrat d'Assurance</h3>
-          <p>Remplissez les informations pour ajouter une nouvelle police</p>
-        </div>
+    <!-- Formulaire -->
+    <div class="card">
+      <div class="card-header">
+        <h2>{{ isEditing ? 'Modifier le contrat' : 'Nouveau contrat' }}</h2>
+        <button v-if="isEditing" class="btn btn-text" @click="cancelEdit">
+          Annuler
+        </button>
       </div>
-      
-      <div class="form-body">
-        <div class="form-grid">
+
+      <div class="form">
+        <div class="form-row">
           <div class="form-group">
-            <label class="form-label">
-              <span class="label-icon">🚗</span>
-              Véhicule *
-            </label>
-            <div class="select-wrapper framed-input">
-              <select v-model="form.vehicleId" class="modern-input select-filled" :class="{ 'input-error': !form.vehicleId && submitted }" @change="onVehicleChange">
-                <option value="" disabled>Choisir un véhicule...</option>
-                <option v-for="v in vehicles" :key="v.id" :value="v.id">
-                  {{ v.plate }} - {{ v.model || 'Modèle non spécifié' }} ({{ getVehicleStatus(v) }})
-                </option>
-              </select>
-              <div class="select-arrow">▼</div>
-            </div>
-            <!-- Indicateur d'assurance en cours -->
-            <div v-if="form.vehicleId" class="insurance-status-info framed-section">
-              <div v-if="hasActiveInsurance(form.vehicleId)" class="warning-status">
-                <span class="status-icon">⚠️</span>
-                <div class="status-details">
-                  <p class="status-title">Une assurance est en cours</p>
-                  <p class="status-description">
-                    POL-{{ getActiveInsurance(form.vehicleId)?.policyNo }} • 
-                    Valide jusqu'au {{ formatDate(getActiveInsurance(form.vehicleId)?.endAt) }}
-                  </p>
-                  <p v-if="dates.start && new Date(dates.start) > new Date()" class="status-note">
-                    <span class="note-icon">📅</span>
-                    Cette nouvelle assurance sera visible à partir du {{ formatDate(dates.start) }}
-                  </p>
-                  <p v-else-if="dates.start" class="status-note">
-                    <span class="note-icon">🔄</span>
-                    Cette assurance remplacera l'ancienne immédiatement
-                  </p>
-                </div>
-              </div>
-              <div v-else class="success-status">
-                <span class="status-icon">✅</span>
-                <div class="status-details">
-                  <p class="status-title">Aucune assurance en cours</p>
-                  <p class="status-description">
-                    Ce véhicule peut être assuré immédiatement
-                  </p>
-                </div>
-              </div>
+            <label>Véhicule <span class="required">*</span></label>
+            <select v-model="form.vehicleId" :class="{ error: submitted && !form.vehicleId }" @change="onVehicleChange">
+              <option value="" disabled>Sélectionner un véhicule</option>
+              <option
+                v-for="v in selectableVehicles"
+                :key="v.id"
+                :value="v.id"
+                :disabled="isVehicleInRepair(v)"
+              >
+                {{ v.plate }} - {{ v.model || 'N/A' }}{{ isVehicleInRepair(v) ? ' (EN RÉPARATION)' : '' }}
+              </option>
+            </select>
+            <div v-if="form.vehicleId" class="field-hint" :class="hasActiveInsurance(form.vehicleId) ? 'warning' : 'success'">
+              <span v-if="hasActiveInsurance(form.vehicleId)">
+                ⚠️ Assurance active jusqu'au {{ formatDate(getActiveInsurance(form.vehicleId)?.endAt) }}
+              </span>
+              <span v-else>✅ Aucune assurance active</span>
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">
-              <span class="label-icon">🏢</span>
-              Assureur *
-            </label>
-            <div class="select-wrapper framed-input">
-              <select v-model="form.insurerId" class="modern-input select-filled" @change="handleInsurerChange" 
-                      :class="{ 'input-error': !form.insurerId && submitted }">
-                <option value="" disabled>Choisir un assureur...</option>
-                <option v-for="ins in insurers" :key="ins.id" :value="ins.id">
-                  {{ ins.name }}
-                </option>
-                <option value="NEW" class="opt-new">+ Nouvel assureur</option>
-              </select>
-              <div class="select-arrow">▼</div>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">
-              <span class="label-icon">🛡️</span>
-              Type de couverture *
-            </label>
-            <div class="select-wrapper framed-input">
-              <select v-model="form.insurancesType" class="modern-input select-filled">
-                <option value="RC">Responsabilité Civile (RC)</option>
-                <option value="TIERS">Tiers Simple</option>
-                <option value="INTERMEDIAIRE">Intermédiaire</option>
-                <option value="TOUS_RISQUES">Tous Risques</option>
-              </select>
-              <div class="select-arrow">▼</div>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">
-              <span class="label-icon">🔢</span>
-              N° de Police *
-            </label>
-            <div class="input-with-prefix framed-input">
-              <span class="input-prefix">POL-</span>
-              <input v-model="form.policyNo" type="text" class="modern-input" 
-                     placeholder="2025-001" :class="{ 'input-error': !form.policyNo && submitted }" />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">
-              <span class="label-icon">📅</span>
-              Durée du contrat *
-            </label>
-            <div class="duration-group framed-input">
-              <div class="duration-input">
-                <input type="number" v-model.number="durationValue" class="modern-input num-input" min="1" 
-                       @input="calculateEndDate" />
-                <select v-model="durationUnit" class="modern-input unit-select" @change="calculateEndDate">
-                  <option value="months">Mois</option>
-                  <option value="years">Années</option>
-                </select>
-                <input type="date" v-model="dates.start" @change="calculateEndDate" 
-                       class="modern-input date-start" />
-              </div>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">
-              <span class="label-icon">📆</span>
-              Échéance (auto)
-            </label>
-            <div class="date-display framed-input">
-              <input type="date" v-model="dates.end" class="modern-input date-display-field" readonly 
-                     :class="getDateFieldClass(dates.end)" />
-              <span class="date-info">Calculée automatiquement</span>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">
-              <span class="label-icon">💵</span>
-              Coût annuel (FCFA) *
-            </label>
-            <div class="input-with-suffix framed-input">
-              <input type="number" v-model.number="form.premium" class="modern-input" 
-                     placeholder="0" :class="{ 'input-error': (!form.premium || form.premium <= 0) && submitted }" />
-              <span class="input-suffix">FCFA</span>
-            </div>
+            <label>Assureur <span class="required">*</span></label>
+            <select v-model="form.insurerId" :class="{ error: submitted && !form.insurerId }" @change="handleInsurerChange">
+              <option value="" disabled>Sélectionner un assureur</option>
+              <option v-for="ins in insurers" :key="ins.id" :value="ins.id">{{ ins.name }}</option>
+              <option value="NEW">+ Ajouter un assureur</option>
+            </select>
           </div>
         </div>
 
-        <Transition name="slide-fade">
-          <div v-if="showNewInsurerInput" class="new-insurer-form framed-section">
-            <div class="new-insurer-header">
-              <span class="new-insurer-icon framed-icon-small">➕</span>
-              <h4>Nouvel assureur</h4>
-            </div>
-            <div class="new-insurer-body">
-              <input v-model="newInsurerName" placeholder="Nom de l'assureur..." 
-                     class="modern-input insurer-name-input framed-input" @keyup.enter="saveNewInsurer" />
-              <button @click="saveNewInsurer" class="btn-save-insurer" :disabled="!newInsurerName.trim()">
-                <span class="btn-icon">✓</span>
-                <span>Enregistrer</span>
+        <!-- Nouvel assureur -->
+        <div v-if="showNewInsurerInput" class="form-row">
+          <div class="form-group">
+            <label>Nom du nouvel assureur</label>
+            <div class="input-group">
+              <input v-model.trim="newInsurerName" type="text" placeholder="Ex: AXA Assurance" />
+              <button class="btn btn-primary" :disabled="!newInsurerName" @click="saveNewInsurer">
+                Ajouter
               </button>
             </div>
           </div>
-        </Transition>
+        </div>
 
-        <div class="form-footer">
-          <button @click="create" :disabled="submitting || !form.vehicleId || !form.insurerId || !form.policyNo || !form.premium" 
-                  class="btn-submit framed-btn" :class="{ 'btn-loading': submitting }">
-            <span class="btn-content">
-              <span v-if="!submitting" class="btn-icon">⚡</span>
-              <span v-if="!submitting" class="btn-text">Valider le contrat</span>
-              <span v-if="submitting" class="loading-spinner"></span>
-            </span>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Type de couverture <span class="required">*</span></label>
+            <select v-model="form.insurancesType">
+              <option value="TIERS">Tiers Simple</option>
+              <option value="INTERMEDIAIRE">Intermédiaire</option>
+              <option value="TOUS_RISQUES">Tous Risques</option>
+              <option value="RC">Responsabilité Civile</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>N° de police <span class="required">*</span></label>
+            <input v-model.trim="form.policyNo" type="text" placeholder="POL-2025-001" 
+                   :class="{ error: submitted && !form.policyNo }" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date de début <span class="required">*</span></label>
+            <input v-model="form.startAt" type="date" @change="calculateEndDate" />
+          </div>
+
+          <div class="form-group">
+            <label>Durée</label>
+            <div class="duration-group">
+              <input v-model.number="form.durationValue" type="number" min="1" @input="calculateEndDate" />
+              <select v-model="form.durationUnit" @change="calculateEndDate">
+                <option value="months">Mois</option>
+                <option value="years">Années</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Date d'échéance</label>
+            <input v-model="form.endAt" type="date" readonly class="readonly" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Coût annuel (FCFA) <span class="required">*</span></label>
+            <input v-model.number="form.premium" type="number" min="0" step="1000" 
+                   :class="{ error: submitted && !form.premium }" />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary" :disabled="submitting || !canSubmit" @click="submitForm">
+            <span v-if="submitting" class="spinner"></span>
+            {{ submitting ? 'Traitement...' : (isEditing ? 'Mettre à jour' : 'Enregistrer le contrat') }}
           </button>
         </div>
+
+        <!-- Messages -->
+        <div v-if="error" class="alert error">{{ error }}</div>
+        <div v-if="success" class="alert success">{{ success }}</div>
       </div>
-    </section>
+    </div>
 
-    <!-- Historique des Polices -->
-    <main class="table-section">
-      <div class="table-card card framed-card">
-        <div class="table-header">
-          <div class="table-header-left">
-            <div class="table-title-wrapper">
-              <h3 class="table-title">Historique des polices</h3>
-              <span class="table-count framed-badge">{{ filteredItems.length }} contrats</span>
-            </div>
-            <div class="table-filters">
-              <div class="period-filter framed-input">
-                <div class="period-input">
-                  <label><span class="filter-icon">📅</span> Du:</label>
-                  <input type="date" v-model="filterDates.from" class="date-input" />
+    <!-- Liste des contrats -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Historique des contrats <span class="badge">{{ filteredItems.length }}</span></h2>
+        <button class="btn btn-text" @click="clearFilters">Effacer les filtres</button>
+      </div>
+
+      <!-- Filtres -->
+      <div class="filters">
+        <input v-model="fromDate" type="date" placeholder="Date début" />
+        <input v-model="toDate" type="date" placeholder="Date fin" />
+        <input v-model.trim="searchPlate" type="text" placeholder="Rechercher une plaque..." />
+        <select v-model="statusFilter">
+          <option value="ALL">Tous les statuts</option>
+          <option value="ACTIVE">Actives</option>
+          <option value="EXPIRING">À renouveler</option>
+          <option value="EXPIRED">Expirées</option>
+        </select>
+      </div>
+
+      <!-- Table -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Véhicule</th>
+              <th>Assureur</th>
+              <th>Période</th>
+              <th>Statut</th>
+              <th>Coût</th>
+              <th>Modifiable</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in paginatedItems" :key="item.id">
+              <td>
+                <div class="cell-primary">{{ item.vehicle?.plate || '-' }}</div>
+                <div class="cell-secondary">
+                  {{ coverageLabel(item.insurancesType) }}
+                  <span v-if="isVehicleInRepair(item.vehicle)"> • EN RÉPARATION</span>
                 </div>
-                <div class="period-input">
-                  <label><span class="filter-icon">📅</span> Au:</label>
-                  <input type="date" v-model="filterDates.to" class="date-input" />
+              </td>
+              <td>
+                <div class="cell-primary">{{ item.insurer?.name || '-' }}</div>
+                <div class="cell-secondary">N° {{ item.policyNo || '-' }}</div>
+              </td>
+              <td>
+                <div class="cell-primary">{{ formatDate(item.startAt) }} → {{ formatDate(item.endAt) }}</div>
+              </td>
+              <td>
+                <span :class="['status', statusClass(item)]">{{ statusLabel(item) }}</span>
+              </td>
+              <td>
+                <div class="cell-primary">{{ formatFCFA(item.premium) }}</div>
+              </td>
+              <td>
+                <span :class="['badge-modifiable', canModify(item.createdAt) ? 'success' : 'error']">
+                  {{ canModify(item.createdAt) ? 'Autorisé' : 'Verrouillé' }}
+                </span>
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <button class="btn-icon-only" :disabled="!canModify(item.createdAt)" @click="startEdit(item)">
+                    ✏️
+                  </button>
+                  <button class="btn-icon-only" :disabled="!canModify(item.createdAt)" @click="deleteItem(item)">
+                    🗑️
+                  </button>
                 </div>
-                <button v-if="filterDates.from || filterDates.to" @click="resetDateFilter" class="btn-clear">
-                  <span class="clear-icon">✕</span>
-                  Effacer
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="table-header-right">
-            <div class="search-box framed-input">
-              <span class="search-icon">🔍</span>
-              <input v-model="searchQuery" type="text" placeholder="Rechercher une plaque..." 
-                     class="search-input" />
-            </div>
-            <div class="status-filter-wrapper framed-input">
-              <select v-model="filterStatus" class="status-filter">
-                <option value="all">Tous les statuts</option>
-                <option value="active">Actifs</option>
-                <option value="expiring">Expirent bientôt</option>
-                <option value="expired">Expirés</option>
-              </select>
-            </div>
-          </div>
-        </div>
+              </td>
+            </tr>
+            <tr v-if="!filteredItems.length">
+              <td colspan="7" class="empty">Aucun contrat trouvé</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-        <div class="table-responsive">
-          <table class="dashboard-table">
-            <thead>
-              <tr>
-                <th class="col-vehicle">
-                  <span class="th-icon">🚗</span>
-                  Véhicule
-                </th>
-                <th class="col-insurer">
-                  <span class="th-icon">🏢</span>
-                  Assureur
-                </th>
-                <th class="col-period">
-                  <span class="th-icon">📅</span>
-                  Période
-                </th>
-                <th class="col-status">
-                  <span class="th-icon">🔄</span>
-                  Statut
-                </th>
-                <th class="col-premium">
-                  <span class="th-icon">💰</span>
-                  Coût
-                </th>
-                <th class="col-modification">
-                  <span class="th-icon">⚙️</span>
-                  Modifiable
-                </th>
-                <th class="col-actions">
-                  <span class="th-icon">🔧</span>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="it in paginatedItems" :key="it.id" :class="getRowClass(it.endAt)">
-                <td class="cell-vehicle">
-                  <div class="vehicle-info">
-                    <span class="vehicle-icon">🚗</span>
-                    <div class="vehicle-details">
-                      <span class="plate-tag framed-badge">{{ it.vehicle?.plate }}</span>
-                      <span class="vehicle-type">{{ formatInsuranceType(it.insurancesType) }}</span>
-                      <span v-if="it.vehicle?.status" :class="['vehicle-status', getVehicleStatusClass(it.vehicle)]">
-                        {{ getVehicleStatus(it.vehicle) }}
-                      </span>
-                    </div>
-                  </div>
-                </td>
-                
-                <td class="cell-insurer">
-                  <div class="insurer-info">
-                    <span class="insurer-name">{{ it.insurer?.name || 'Inconnu' }}</span>
-                    <span class="policy-number framed-text">N° {{ it.policyNo || '—' }}</span>
-                  </div>
-                </td>
-                
-                <td class="cell-period">
-                  <div class="period-info">
-                    <span class="period-dates">{{ formatDate(it.startAt) }} → {{ formatDate(it.endAt) }}</span>
-                  </div>
-                </td>
-                
-                <td class="cell-status">
-                  <span :class="['status-pill', 'framed-pill', getDaysRemainingClass(it.endAt)]">
-                    <span class="pill-icon">{{ getDaysRemainingIcon(it.endAt) }}</span>
-                    {{ getDaysRemainingText(it.endAt) }}
-                  </span>
-                </td>
-                
-                <td class="cell-premium">
-                  <div class="premium-info">
-                    <span class="premium-value framed-text">{{ formatCurrency(it.premium) }}</span>
-                  </div>
-                </td>
-                
-                <td class="cell-modification">
-                  <div class="modification-status">
-                    <span v-if="canModify(it.createdAt)" class="modify-allowed framed-status allowed">
-                      <span class="status-icon">✅</span>
-                      <span class="status-text">Modifiable</span>
-                      <span class="status-time">Jusqu'au {{ formatDate(getModificationDeadline(it.createdAt)) }}</span>
-                    </span>
-                    <span v-else class="modify-locked framed-status locked">
-                      <span class="status-icon">🔒</span>
-                      <span class="status-text">Verrouillé</span>
-                      <span class="status-time">Depuis le {{ formatDate(getModificationDeadline(it.createdAt)) }}</span>
-                    </span>
-                  </div>
-                </td>
-                
-                <td class="cell-actions">
-                  <div class="action-buttons">
-                    <button @click="openEditModal(it)" 
-                            class="action-btn btn-edit framed-btn" 
-                            :disabled="!canModify(it.createdAt)"
-                            :title="canModify(it.createdAt) ? 'Modifier le contrat' : 'Verrouillé après 3 jours'">
-                      <span class="action-icon">✏️</span>
-                      <span class="action-text">Modifier</span>
-                    </button>
-                    <button @click="remove(it)" 
-                            class="action-btn btn-delete framed-btn" 
-                            :disabled="!canModify(it.createdAt)"
-                            :title="canModify(it.createdAt) ? 'Supprimer le contrat' : 'Verrouillé après 3 jours'">
-                      <span class="action-icon">🗑️</span>
-                      <span class="action-text">Supprimer</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              
-              <tr v-if="filteredItems.length === 0">
-                <td colspan="7" class="no-results">
-                  <div class="no-results-content">
-                    <span class="no-results-icon">📭</span>
-                    <p>Aucun contrat trouvé</p>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Pagination -->
-        <div class="table-footer">
-          <div class="pagination-info">
-            <span class="pagination-text">
-              Page {{ currentPage }} sur {{ totalPages || 1 }}
-              <span class="pagination-count framed-text">({{ filteredItems.length }} résultats)</span>
-            </span>
-          </div>
-          
-          <div class="pagination-controls">
-            <button @click="currentPage--" :disabled="currentPage === 1" class="pagination-btn btn-prev framed-btn">
-              <span class="btn-arrow">←</span>
-              Précédent
-            </button>
-            
-            <div class="page-numbers">
-              <button v-for="page in getVisiblePages()" :key="page" 
-                      @click="currentPage = page" 
-                      :class="['page-number', 'framed-btn', { active: currentPage === page }]">
-                {{ page }}
-              </button>
-            </div>
-            
-            <button @click="currentPage++" :disabled="currentPage >= totalPages" class="pagination-btn btn-next framed-btn">
-              Suivant
-              <span class="btn-arrow">→</span>
-            </button>
-          </div>
+      <!-- Pagination -->
+      <div class="pagination">
+        <span class="page-info">Page {{ currentPage }} / {{ totalPages }}</span>
+        <div class="page-buttons">
+          <button :disabled="currentPage === 1" @click="currentPage--">←</button>
+          <button :disabled="currentPage === totalPages" @click="currentPage++">→</button>
         </div>
       </div>
-    </main>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import api from "../services/api";
 
-// --- ÉTATS ---
+// ==================== ÉTATS ====================
+const loading = ref(false);
+const submitting = ref(false);
+const submitted = ref(false);
+const error = ref("");
+const success = ref("");
+
 const vehicles = ref([]);
 const insurers = ref([]);
 const items = ref([]);
-const allInsurances = ref([]); // Toutes les assurances
-const insuranceHistory = ref({}); // Historique par véhicule
-const loading = ref(false);
-const submitting = ref(false);
-const updating = ref(false);
-const submitted = ref(false);
-const error = ref("");
-const successMessage = ref("");
-const searchQuery = ref("");
-const filterStatus = ref("all");
-const filterDates = ref({ from: "", to: "" });
+const allInsurances = ref([]);
+const insuranceHistory = ref({});
+
+const normalizeVehicleStatus = (status) => String(status || "").trim().toUpperCase();
+const isVehicleOutOfService = (vehicle) => {
+  const s = normalizeVehicleStatus(vehicle?.status);
+  return s === "HORS_SERVICE" || s === "HORS SERVICE";
+};
+const isVehicleInRepair = (vehicle) => {
+  const s = normalizeVehicleStatus(vehicle?.status);
+  return s === "EN_REPARATION" || s === "EN REPARATION";
+};
+const isVehicleInService = (vehicle) => {
+  const s = normalizeVehicleStatus(vehicle?.status);
+  return s === "EN_SERVICE" || s === "EN SERVICE" || s === "ACTIF" || s === "ACTIVE";
+};
+const selectableVehicles = computed(() => vehicles.value.filter((v) => !isVehicleOutOfService(v)));
+const selectedVehicle = computed(() => vehicles.value.find((v) => String(v.id) === String(form.vehicleId)));
+
+const isEditing = ref(false);
+const editingId = ref(null);
+
+// Filtres
+const fromDate = ref("");
+const toDate = ref("");
+const searchPlate = ref("");
+const statusFilter = ref("ALL");
 const currentPage = ref(1);
-const itemsPerPage = 8;
+const pageSize = 10;
+
+// Nouvel assureur
 const showNewInsurerInput = ref(false);
 const newInsurerName = ref("");
 
-// Modal d'édition
-const showEditModal = ref(false);
-const selectedItem = ref(null);
-const editForm = ref({
+// ==================== FONCTIONS UTILITAIRES ====================
+const formatDateInputLocal = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateInput = (value) => {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0);
+};
+
+const formatDate = (date) => {
+  if (!date) return "-";
+  return new Date(date).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+};
+
+const formatFCFA = (value) => {
+  const num = Number(value) || 0;
+  return new Intl.NumberFormat("fr-FR").format(num) + " FCFA";
+};
+
+const compactAmount = (amount) => {
+  const n = Number(amount) || 0;
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return Math.round(n / 1_000) + "k";
+  return n.toString();
+};
+
+const coverageLabel = (type) => {
+  const labels = {
+    TIERS: "Tiers",
+    INTERMEDIAIRE: "Intermédiaire",
+    TOUS_RISQUES: "Tous Risques",
+    RC: "RC"
+  };
+  return labels[type] || type;
+};
+
+// ==================== DATES ====================
+const daysDiff = (date) => {
+  if (!date) return 9999;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+};
+
+const calculateEndDate = () => {
+  if (!form.startAt || !form.durationValue) return;
+
+  const start = parseDateInput(form.startAt);
+  const duration = Number(form.durationValue);
+  
+  if (!start || !duration || duration <= 0) return;
+
+  const year = start.getFullYear();
+  const month = start.getMonth();
+  const day = start.getDate();
+  
+  let targetYear = year;
+  let targetMonth = month;
+  
+  if (form.durationUnit === "years") {
+    targetYear = year + duration;
+  } else {
+    const totalMonths = month + duration;
+    targetYear = year + Math.floor(totalMonths / 12);
+    targetMonth = totalMonths % 12;
+  }
+  
+  const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const targetDay = Math.min(day, lastDay);
+  
+  const end = new Date(targetYear, targetMonth, targetDay, 12, 0, 0);
+  form.endAt = formatDateInputLocal(end);
+};
+
+// ==================== FORMULAIRE ====================
+const form = reactive({
+  vehicleId: "",
   insurerId: "",
   insurancesType: "TIERS",
   policyNo: "",
   premium: 0,
   durationValue: 12,
   durationUnit: "months",
-  startAt: "",
-  endAt: ""
+  startAt: formatDateInputLocal(new Date()),
+  endAt: "",
 });
 
-// Formulaire
-const form = ref({
-  vehicleId: "",
-  insurerId: "",
-  insurancesType: "TIERS",
-  premium: 0,
-  policyNo: ""
+const canSubmit = computed(() => {
+  return form.vehicleId && 
+         form.insurerId && 
+         form.insurerId !== "NEW" && 
+         form.policyNo && 
+         form.startAt && 
+         form.endAt && 
+         form.premium > 0 &&
+         isVehicleInService(selectedVehicle.value);
 });
 
-const durationValue = ref(12);
-const durationUnit = ref("months");
-const dates = ref({
-  start: new Date().toISOString().split('T')[0],
-  end: ""
+// ==================== KPI ====================
+const activePolicies = computed(() => items.value.filter(i => daysDiff(i.endAt) >= 0).length);
+const expiringSoon = computed(() => items.value.filter(i => {
+  const d = daysDiff(i.endAt);
+  return d >= 0 && d <= 30;
+}).length);
+const expiredPolicies = computed(() => items.value.filter(i => daysDiff(i.endAt) < 0).length);
+const totalPremium = computed(() => items.value.reduce((acc, i) => acc + (Number(i.premium) || 0), 0));
+
+// ==================== FILTRES ====================
+const filteredItems = computed(() => {
+  return items.value.filter(item => {
+    const plate = (item.vehicle?.plate || "").toLowerCase();
+    if (searchPlate.value && !plate.includes(searchPlate.value.toLowerCase())) return false;
+
+    const d = daysDiff(item.endAt);
+    if (statusFilter.value === "ACTIVE" && d < 0) return false;
+    if (statusFilter.value === "EXPIRING" && !(d >= 0 && d <= 30)) return false;
+    if (statusFilter.value === "EXPIRED" && d >= 0) return false;
+
+    const createdAt = item.createdAt ? formatDateInputLocal(item.createdAt) : "";
+    if (fromDate.value && createdAt < fromDate.value) return false;
+    if (toDate.value && createdAt > toDate.value) return false;
+
+    return true;
+  }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 });
 
-// --- LOGIQUE 3 JOURS ---
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / pageSize)));
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredItems.value.slice(start, start + pageSize);
+});
+
+// ==================== STATUTS ====================
+const statusClass = (item) => {
+  const d = daysDiff(item.endAt);
+  if (d < 0) return "expired";
+  if (d <= 30) return "warning";
+  return "active";
+};
+
+const statusLabel = (item) => {
+  const d = daysDiff(item.endAt);
+  if (d < 0) return `Expirée (${Math.abs(d)}j)`;
+  if (d <= 30) return `${d} jours`;
+  return "Active";
+};
+
+// ==================== MODIFICATION ====================
+const MODIFICATION_HOURS = 72;
+
 const canModify = (createdAt) => {
-  if (!createdAt) return true;
+  if (!createdAt) return false;
   const created = new Date(createdAt);
-  const now = new Date();
-  const diffHours = (now - created) / (1000 * 60 * 60);
-  return diffHours <= 72; // 72 heures = 3 jours
+  const diffHours = (Date.now() - created) / (1000 * 60 * 60);
+  return diffHours <= MODIFICATION_HOURS;
 };
 
-const getModificationDeadline = (createdAt) => {
-  if (!createdAt) return new Date();
-  const created = new Date(createdAt);
-  const deadline = new Date(created);
-  deadline.setHours(deadline.getHours() + 72); // + 3 jours
-  return deadline;
-};
+// ==================== VÉHICULES ====================
+const getVehicleInsurances = (vehicleId) => insuranceHistory.value[String(vehicleId)] || [];
 
-const getRemainingModificationTime = (createdAt) => {
-  if (!createdAt) return { hours: 0, minutes: 0 };
-  const deadline = getModificationDeadline(createdAt);
-  const now = new Date();
-  const diffMs = deadline - now;
-  
-  if (diffMs <= 0) return { hours: 0, minutes: 0 };
-  
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  
-  return { hours, minutes };
-};
-
-// --- HELPERS ---
-const getVehiclePlate = (vehicleId) => {
-  const vehicle = vehicles.value.find(v => v.id === vehicleId);
-  return vehicle?.plate || '—';
-};
-
-const getVehicleStatus = (vehicle) => {
-  if (!vehicle || !vehicle.status) return 'Actif';
-  const status = vehicle.status.toLowerCase().trim();
-  if (status === 'hors service' || status === 'en panne') {
-    return vehicle.status;
-  }
-  return 'Actif';
-};
-
-const getVehicleStatusClass = (vehicle) => {
-  if (!vehicle || !vehicle.status) return 'status-active';
-  const status = vehicle.status.toLowerCase().trim();
-  if (status === 'hors service') return 'status-inactive';
-  if (status === 'en panne') return 'status-warning';
-  return 'status-active';
-};
-
-const getDaysRemainingIcon = (date) => {
-  if (!date) return '—';
-  const now = new Date();
-  const end = new Date(date);
-  const diff = Math.ceil((end - now) / (1000 * 3600 * 24));
-  
-  if (diff < 0) return '⚠️';
-  if (diff <= 7) return '⏳';
-  if (diff <= 30) return '📅';
-  return '✅';
-};
-
-// --- LOGIQUE ASSURANCES ---
 const hasActiveInsurance = (vehicleId, excludeId = null) => {
   const now = new Date();
-  const vehicleInsurances = insuranceHistory.value[vehicleId] || [];
-  
-  return vehicleInsurances.some(insurance => {
-    if (excludeId && insurance.id === excludeId) return false;
-    
-    const startDate = new Date(insurance.startAt);
-    const endDate = new Date(insurance.endAt);
-    
-    return now >= startDate && now <= endDate;
+  return getVehicleInsurances(vehicleId).some(ins => {
+    if (excludeId && ins.id === excludeId) return false;
+    const start = new Date(ins.startAt);
+    const end = new Date(ins.endAt);
+    return now >= start && now <= end;
   });
 };
 
-const getActiveInsurance = (vehicleId) => {
+const getActiveInsurance = (vehicleId, excludeId = null) => {
   const now = new Date();
-  const vehicleInsurances = insuranceHistory.value[vehicleId] || [];
-  
-  return vehicleInsurances.find(insurance => {
-    const startDate = new Date(insurance.startAt);
-    const endDate = new Date(insurance.endAt);
-    return now >= startDate && now <= endDate;
-  });
+  return getVehicleInsurances(vehicleId).find(ins => {
+    if (excludeId && ins.id === excludeId) return false;
+    const start = new Date(ins.startAt);
+    const end = new Date(ins.endAt);
+    return now >= start && now <= end;
+  }) || null;
 };
 
-// --- LOGIQUE MODIFICATION DATES ---
-const calculateEditEndDate = () => {
-  if (!editForm.value.startAt || !editForm.value.durationValue) return;
-  const start = new Date(editForm.value.startAt);
-  const end = new Date(start);
-  
-  if (editForm.value.durationUnit === "years") {
-    end.setFullYear(start.getFullYear() + editForm.value.durationValue);
-  } else {
-    end.setMonth(start.getMonth() + editForm.value.durationValue);
+// ==================== ACTIONS ====================
+const resetForm = () => {
+  submitted.value = false;
+  form.vehicleId = "";
+  form.insurerId = "";
+  form.insurancesType = "TIERS";
+  form.policyNo = "";
+  form.premium = 0;
+  form.durationValue = 12;
+  form.durationUnit = "months";
+  form.startAt = formatDateInputLocal(new Date());
+  calculateEndDate();
+  showNewInsurerInput.value = false;
+  newInsurerName.value = "";
+  isEditing.value = false;
+  editingId.value = null;
+};
+
+const handleInsurerChange = () => {
+  showNewInsurerInput.value = form.insurerId === "NEW";
+};
+
+const onVehicleChange = () => {
+  if (!form.vehicleId) return;
+  const active = getActiveInsurance(form.vehicleId, editingId.value);
+  if (active?.insurerId && !isEditing.value) {
+    form.insurerId = active.insurerId;
   }
-  end.setDate(end.getDate() - 1);
-  editForm.value.endAt = end.toISOString().split('T')[0];
 };
 
-// --- API ACTIONS ---
-const load = async () => {
-  loading.value = true;
+const clearFilters = () => {
+  fromDate.value = "";
+  toDate.value = "";
+  searchPlate.value = "";
+  statusFilter.value = "ALL";
+};
+
+// ==================== CRUD ====================
+const submitForm = async () => {
   error.value = "";
-  try {
-    const [vRes, iRes, insRes] = await Promise.all([
-      api.get("/vehicles"),
-      api.get("/insurers"),
-      api.get("/insurance")
-    ]);
-    
-    // Filtrer les véhicules: exclure "Hors Service" et "en panne"
-    vehicles.value = (vRes.data?.data || vRes.data || []).filter(v => {
-      const status = (v.status?.toLowerCase() || "").trim();
-      return status !== "hors service" && status !== "en panne";
-    });
-    
-    insurers.value = iRes.data?.data || iRes.data || [];
-    
-    // Stocker toutes les assurances
-    allInsurances.value = insRes.data?.data || insRes.data || [];
-    
-    // Organiser les assurances par véhicule
-    insuranceHistory.value = {};
-    allInsurances.value.forEach(insurance => {
-      const vehicleId = insurance.vehicleId;
-      if (!insuranceHistory.value[vehicleId]) {
-        insuranceHistory.value[vehicleId] = [];
-      }
-      insuranceHistory.value[vehicleId].push(insurance);
-    });
-    
-    // Trier les assurances de chaque véhicule par date de création (plus récente en premier)
-    Object.keys(insuranceHistory.value).forEach(vehicleId => {
-      insuranceHistory.value[vehicleId].sort((a, b) => 
-        new Date(b.createdAt) - new Date(a.createdAt)
-      );
-    });
-    
-    // Déterminer quelle assurance afficher pour chaque véhicule
-    const now = new Date();
-    const insurancesToDisplay = [];
-    
-    Object.keys(insuranceHistory.value).forEach(vehicleId => {
-      const vehicleInsurances = insuranceHistory.value[vehicleId];
-      if (vehicleInsurances.length === 0) return;
-      
-      // Trouver l'assurance "active" selon les règles
-      let insuranceToShow = null;
-      
-      for (const insurance of vehicleInsurances) {
-        const startDate = new Date(insurance.startAt);
-        const endDate = new Date(insurance.endAt);
-        
-        // Vérifier si cette assurance devrait être affichée
-        if (now >= startDate) {
-          // Si l'assurance est en cours
-          if (now <= endDate) {
-            // C'est l'assurance en cours, on l'affiche
-            insuranceToShow = insurance;
-            break;
-          } else {
-            // Assurance expirée, on continue à chercher
-            continue;
-          }
-        } else {
-          // Assurance future, on vérifie si on peut l'afficher
-          // On cherche s'il y a une assurance en cours ou récente
-          const activeOrRecent = vehicleInsurances.find(ins => {
-            const insStart = new Date(ins.startAt);
-            const insEnd = new Date(ins.endAt);
-            return now >= insStart && now <= insEnd;
-          });
-          
-          if (!activeOrRecent) {
-            // Pas d'assurance en cours, on peut afficher la future
-            insuranceToShow = insurance;
-            break;
-          }
-        }
-      }
-      
-      // Si aucune assurance ne correspond aux critères, prendre la dernière
-      if (!insuranceToShow && vehicleInsurances.length > 0) {
-        insuranceToShow = vehicleInsurances[0];
-      }
-      
-      if (insuranceToShow) {
-        // S'assurer que le véhicule existe toujours et est actif
-        const vehicle = vehicles.value.find(v => v.id === vehicleId);
-        if (vehicle) {
-          // Ajouter les informations du véhicule
-          insuranceToShow.vehicle = vehicle;
-          insurancesToDisplay.push(insuranceToShow);
-        }
-      }
-    });
-    
-    // Ajouter les informations de l'assureur
-    items.value = insurancesToDisplay.map(insurance => {
-      const insurer = insurers.value.find(i => i.id === insurance.insurerId);
-      return {
-        ...insurance,
-        insurer: insurer || null
-      };
-    });
-    
-  } catch (err) {
-    console.error("Erreur chargement:", err);
-    error.value = "Erreur lors du chargement des données";
-  } finally {
-    loading.value = false;
-  }
-};
-
-const create = async () => {
+  success.value = "";
   submitted.value = true;
-  
-  // Vérifier que le véhicule est actif
-  const vehicle = vehicles.value.find(v => v.id === form.value.vehicleId);
-  if (!vehicle) {
-    error.value = "Véhicule non trouvé";
-    return;
-  }
-  
-  const vehicleStatus = (vehicle.status?.toLowerCase() || "").trim();
-  if (vehicleStatus === "hors service" || vehicleStatus === "en panne") {
-    error.value = "Impossible d'ajouter une assurance à un véhicule Hors Service ou en panne";
-    return;
-  }
-  
-  // Vérifier les champs obligatoires
-  if (!form.value.vehicleId || !form.value.insurerId || !form.value.policyNo || !form.value.premium) {
-    error.value = "Veuillez remplir tous les champs obligatoires (*)";
-    return;
-  }
-  
-  // Vérifier s'il y a une assurance en cours
-  const activeInsurance = getActiveInsurance(form.value.vehicleId);
-  const startDate = new Date(dates.value.start);
-  const now = new Date();
-  
-  // Avertissement si création d'une assurance future alors qu'une assurance est en cours
-  if (activeInsurance && startDate > now) {
-    const confirmMessage = `Une assurance est déjà en cours pour ce véhicule (POL-${activeInsurance.policyNo}, valide jusqu'au ${formatDate(activeInsurance.endAt)}).\n\nVoulez-vous quand même créer cette nouvelle assurance ? Elle ne sera affichée qu'à partir de sa date de début (${formatDate(dates.value.start)}).`;
-    
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-  }
-  
-  // Avertissement si chevauchement de dates
-  if (activeInsurance && startDate <= new Date(activeInsurance.endAt)) {
-    const confirmMessage = `Attention : cette nouvelle assurance commence avant la fin de l'assurance en cours (POL-${activeInsurance.policyNo}, valide jusqu'au ${formatDate(activeInsurance.endAt)}).\n\nVoulez-vous quand même continuer ?`;
-    
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-  }
-  
-  submitting.value = true;
-  error.value = "";
-  successMessage.value = "";
 
+  if (!canSubmit.value) {
+    error.value = "Veuillez remplir tous les champs obligatoires.";
+    return;
+  }
+  if (!isVehicleInService(selectedVehicle.value)) {
+    error.value = "Impossible: seules les opérations sur véhicule EN SERVICE sont autorisées.";
+    return;
+  }
+
+  submitting.value = true;
   try {
+    const start = parseDateInput(form.startAt) || new Date(form.startAt);
+    const end = parseDateInput(form.endAt) || new Date(form.endAt);
+
     const payload = {
-      vehicleId: String(form.value.vehicleId),
-      insurerId: String(form.value.insurerId),
-      insurancesType: form.value.insurancesType,
-      policyNo: String(form.value.policyNo),
-      premium: parseFloat(form.value.premium) || 0,
-      durationValue: parseInt(durationValue.value) || 1,
-      durationUnit: String(durationUnit.value),
-      startAt: new Date(dates.value.start).toISOString(),
-      endAt: new Date(dates.value.end).toISOString()
+      vehicleId: form.vehicleId,
+      insurerId: form.insurerId,
+      insurancesType: form.insurancesType,
+      policyNo: form.policyNo.replace(/^POL-/i, ""),
+      premium: Number(form.premium),
+      durationValue: Number(form.durationValue),
+      durationUnit: form.durationUnit,
+      startAt: start.toISOString(),
+      endAt: end.toISOString(),
     };
 
-    const response = await api.post("/insurance", payload);
-    console.log("Réponse création:", response.data);
-    
-    let successMsg = "Contrat créé avec succès !";
-    if (activeInsurance) {
-      if (startDate > now) {
-        successMsg += `\nCette assurance sera visible à partir du ${formatDate(dates.value.start)}.`;
-      } else {
-        successMsg += `\nCette assurance remplace l'ancienne (POL-${activeInsurance.policyNo}).`;
-      }
+    if (isEditing.value && editingId.value) {
+      await api.put(`/insurance/${editingId.value}`, payload);
+      success.value = "Contrat mis à jour.";
+    } else {
+      await api.post("/insurance", payload);
+      success.value = "Contrat créé.";
     }
-    
-    successMessage.value = successMsg;
+
     resetForm();
-    await load();
-    
-    setTimeout(() => successMessage.value = "", 5000);
-    
-  } catch (err) {
-    console.error("Erreur création:", err.response?.data || err);
-    error.value = err.response?.data?.message || "Erreur lors de la création du contrat";
+    await loadData();
+  } catch (e) {
+    error.value = e?.response?.data?.message || "Une erreur est survenue.";
   } finally {
     submitting.value = false;
   }
 };
 
-const updateContract = async () => {
-  if (!selectedItem.value || !canModify(selectedItem.value.createdAt)) {
-    error.value = "Impossible de modifier ce contrat";
-    return;
-  }
-  
-  updating.value = true;
-  error.value = "";
-  
-  try {
-    const payload = {
-      insurerId: String(editForm.value.insurerId),
-      insurancesType: editForm.value.insurancesType,
-      policyNo: String(editForm.value.policyNo),
-      premium: parseFloat(editForm.value.premium) || 0,
-      durationValue: parseInt(editForm.value.durationValue) || 1,
-      durationUnit: String(editForm.value.durationUnit),
-      startAt: new Date(editForm.value.startAt).toISOString(),
-      endAt: new Date(editForm.value.endAt).toISOString()
-    };
-
-    console.log("Mise à jour contrat:", selectedItem.value.id, payload);
-    
-    await api.put(`/insurance/${selectedItem.value.id}`, payload);
-    
-    successMessage.value = "Contrat mis à jour avec succès !";
-    closeEditModal();
-    await load();
-    
-    setTimeout(() => successMessage.value = "", 3000);
-    
-  } catch (err) {
-    console.error("Erreur mise à jour:", err.response?.data || err);
-    error.value = err.response?.data?.message || "Erreur lors de la mise à jour";
-  } finally {
-    updating.value = false;
-  }
+const startEdit = (item) => {
+  isEditing.value = true;
+  editingId.value = item.id;
+  submitted.value = false;
+  form.vehicleId = item.vehicleId || "";
+  form.insurerId = item.insurerId || "";
+  form.insurancesType = item.insurancesType || "TIERS";
+  form.policyNo = item.policyNo || "";
+  form.premium = Number(item.premium) || 0;
+  form.durationValue = Number(item.durationValue) || 12;
+  form.durationUnit = item.durationUnit || "months";
+  form.startAt = item.startAt ? item.startAt.substring(0, 10) : formatDateInputLocal(new Date());
+  form.endAt = item.endAt ? item.endAt.substring(0, 10) : "";
+  if (!form.endAt) calculateEndDate();
 };
 
-const remove = async (item) => {
-  if (!canModify(item.createdAt)) {
-    error.value = "Impossible de supprimer ce contrat après 3 jours";
-    return;
-  }
-  
-  if (!confirm(`Voulez-vous vraiment supprimer le contrat ${item.policyNo} ?`)) {
-    return;
-  }
-  
+const cancelEdit = () => resetForm();
+
+const deleteItem = async (item) => {
+  if (!canModify(item.createdAt)) return;
+  if (!confirm("Supprimer ce contrat ?")) return;
+
   try {
     await api.delete(`/insurance/${item.id}`);
-    successMessage.value = "Contrat supprimé avec succès";
-    await load();
-    
-    setTimeout(() => successMessage.value = "", 3000);
-    
-  } catch (err) {
-    console.error("Erreur suppression:", err.response?.data || err);
-    error.value = err.response?.data?.message || "Erreur lors de la suppression";
+    success.value = "Contrat supprimé.";
+    await loadData();
+  } catch (e) {
+    error.value = "Erreur lors de la suppression.";
   }
 };
 
 const saveNewInsurer = async () => {
-  if (!newInsurerName.value.trim()) {
-    error.value = "Veuillez saisir un nom d'assureur";
-    return;
-  }
+  if (!newInsurerName.value.trim()) return;
   
   try {
     const res = await api.post("/insurers", { name: newInsurerName.value.trim() });
     const created = res.data?.data || res.data;
-    
     insurers.value.push(created);
-    form.value.insurerId = created.id;
+    form.insurerId = created.id;
     showNewInsurerInput.value = false;
     newInsurerName.value = "";
-    successMessage.value = "Assureur ajouté avec succès";
-    
-    setTimeout(() => successMessage.value = "", 3000);
-    
-  } catch (err) {
-    console.error("Erreur création assureur:", err.response?.data || err);
-    error.value = err.response?.data?.message || "Erreur lors de la création de l'assureur";
+    success.value = "Assureur ajouté.";
+  } catch (e) {
+    error.value = "Erreur lors de l'ajout.";
   }
 };
 
-// --- MODAL ---
-const openEditModal = (item) => {
-  if (!canModify(item.createdAt)) {
-    error.value = "Ce contrat ne peut plus être modifié après 3 jours";
-    return;
-  }
+// ==================== CHARGEMENT ====================
+const loadData = async () => {
+  loading.value = true;
+  error.value = "";
   
-  selectedItem.value = item;
-  editForm.value = {
-    insurerId: item.insurerId,
-    insurancesType: item.insurancesType,
-    policyNo: item.policyNo,
-    premium: item.premium,
-    durationValue: item.durationValue,
-    durationUnit: item.durationUnit,
-    startAt: item.startAt ? new Date(item.startAt).toISOString().split('T')[0] : '',
-    endAt: item.endAt ? new Date(item.endAt).toISOString().split('T')[0] : ''
-  };
-  showEditModal.value = true;
-};
-
-const closeEditModal = () => {
-  showEditModal.value = false;
-  selectedItem.value = null;
-  editForm.value = {
-    insurerId: "",
-    insurancesType: "TIERS",
-    policyNo: "",
-    premium: 0,
-    durationValue: 12,
-    durationUnit: "months",
-    startAt: "",
-    endAt: ""
-  };
-};
-
-// --- LOGIQUE DATES ---
-const calculateEndDate = () => {
-  if (!dates.value.start || !durationValue.value) return;
-  const start = new Date(dates.value.start);
-  const end = new Date(start);
-  
-  if (durationUnit.value === "years") {
-    end.setFullYear(start.getFullYear() + durationValue.value);
-  } else {
-    end.setMonth(start.getMonth() + durationValue.value);
-  }
-  end.setDate(end.getDate() - 1);
-  dates.value.end = end.toISOString().split('T')[0];
-};
-
-// Watch pour la durée dans la modal
-watch(() => editForm.value.startAt, calculateEditEndDate);
-watch(() => editForm.value.durationValue, calculateEditEndDate);
-watch(() => editForm.value.durationUnit, calculateEditEndDate);
-
-watch([() => dates.value.start, durationValue, durationUnit], calculateEndDate, { immediate: true });
-
-// --- FILTRAGE ---
-const filteredItems = computed(() => {
-  return items.value.filter(it => {
-    // Recherche par plaque
-    const plate = it.vehicle?.plate?.toLowerCase() || "";
-    const matchesSearch = plate.includes(searchQuery.value.toLowerCase());
-    
-    // Statut
-    const diffDays = Math.ceil((new Date(it.endAt) - new Date()) / (1000 * 3600 * 24));
-    let matchesStatus = true;
-    if (filterStatus.value === "expired") matchesStatus = diffDays < 0;
-    else if (filterStatus.value === "expiring") matchesStatus = diffDays >= 0 && diffDays <= 30;
-    else if (filterStatus.value === "active") matchesStatus = diffDays > 30;
-
-    // Dates de création
-    const createdAt = new Date(it.createdAt).toISOString().split('T')[0];
-    let matchesDate = true;
-    if (filterDates.value.from) matchesDate = matchesDate && createdAt >= filterDates.value.from;
-    if (filterDates.value.to) matchesDate = matchesDate && createdAt <= filterDates.value.to;
-
-    return matchesSearch && matchesStatus && matchesDate;
-  }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-});
-
-const paginatedItems = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage;
-  return filteredItems.value.slice(start, start + itemsPerPage);
-});
-
-const totalPages = computed(() => Math.ceil(filteredItems.value.length / itemsPerPage));
-
-const getVisiblePages = () => {
-  const pages = [];
-  const maxVisible = 5;
-  let start = Math.max(1, currentPage.value - Math.floor(maxVisible / 2));
-  let end = Math.min(totalPages.value, start + maxVisible - 1);
-  
-  if (end - start + 1 < maxVisible) {
-    start = Math.max(1, end - maxVisible + 1);
-  }
-  
-  for (let i = start; i <= end; i++) {
-    pages.push(i);
-  }
-  return pages;
-};
-
-// --- KPI ---
-const totalPremium = computed(() => 
-  items.value.reduce((sum, it) => sum + (Number(it.premium) || 0), 0)
-);
-
-const upcomingRenewals = computed(() => {
-  const now = new Date();
-  return items.value.filter(it => {
-    if (!it.endAt) return false;
-    const end = new Date(it.endAt);
-    const diff = Math.ceil((end - now) / (1000 * 3600 * 24));
-    return diff > 0 && diff <= 30;
-  }).length;
-});
-
-const expiredCount = computed(() => {
-  const now = new Date();
-  return items.value.filter(it => {
-    if (!it.endAt) return false;
-    const end = new Date(it.endAt);
-    return end < now;
-  }).length;
-});
-
-// --- FORMATAGE ---
-const today = computed(() => new Date().toLocaleDateString('fr-FR', { 
-  weekday: 'long', 
-  year: 'numeric', 
-  month: 'long', 
-  day: 'numeric' 
-}));
-
-const formatCurrency = (v) => {
-  const num = Number(v) || 0;
-  return new Intl.NumberFormat('fr-FR').format(num) + ' FCFA';
-};
-
-const formatCompactCurrency = (v) => {
-  const num = Number(v) || 0;
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M FCFA';
-  if (num >= 1000) return (num / 1000).toFixed(0) + 'k FCFA';
-  return formatCurrency(num);
-};
-
-const formatDate = (d) => {
-  if (!d) return '—';
   try {
-    return new Date(d).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
+    const [vRes, iRes, pRes] = await Promise.all([
+      api.get("/vehicles"),
+      api.get("/insurers"),
+      api.get("/insurance"),
+    ]);
+    
+    vehicles.value = vRes.data?.data || vRes.data || [];
+    insurers.value = iRes.data?.data || iRes.data || [];
+    allInsurances.value = pRes.data?.data || pRes.data || [];
+
+    // Construire l'historique
+    insuranceHistory.value = {};
+    allInsurances.value.forEach(ins => {
+      const vid = String(ins.vehicleId || ins.vehicle?.id);
+      if (!vid) return;
+      if (!insuranceHistory.value[vid]) insuranceHistory.value[vid] = [];
+      insuranceHistory.value[vid].push(ins);
     });
-  } catch (err) {
-    return '—';
-  }
-};
 
-const formatDateTime = (d) => {
-  if (!d) return '—';
-  try {
-    return new Date(d).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    // Construire l'affichage
+    const display = [];
+    vehicles.value
+      .filter((vehicle) => !isVehicleOutOfService(vehicle))
+      .forEach(vehicle => {
+      const vid = String(vehicle.id);
+      const vehicleIns = insuranceHistory.value[vid] || [];
+      if (!vehicleIns.length) return;
+
+      const now = new Date();
+      const active = vehicleIns.find(ins => {
+        const start = new Date(ins.startAt);
+        const end = new Date(ins.endAt);
+        return now >= start && now <= end;
+      });
+
+      const future = vehicleIns
+        .filter(ins => new Date(ins.startAt) > now)
+        .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))[0];
+
+      const toShow = active || future || vehicleIns[0];
+      if (!toShow) return;
+
+      const insurer = insurers.value.find(i => String(i.id) === String(toShow.insurerId)) || toShow.insurer;
+      display.push({ ...toShow, vehicle, insurer });
     });
-  } catch (err) {
-    return '—';
+
+    items.value = display;
+  } catch (e) {
+    error.value = "Impossible de charger les données.";
+  } finally {
+    loading.value = false;
   }
 };
 
-const formatDuration = (v, u) => {
-  if (!v || !u) return '—';
-  return `${v} ${u === 'years' ? 'an(s)' : 'mois'}`;
-};
+// ==================== INIT ====================
+onMounted(() => {
+  calculateEndDate();
+  loadData();
+});
 
-const formatInsuranceType = (t) => {
-  if (!t) return '—';
-  const types = {
-    'RC': 'Responsabilité Civile',
-    'TIERS': 'Tiers Simple',
-    'INTERMEDIAIRE': 'Intermédiaire',
-    'TOUS_RISQUES': 'Tous Risques'
-  };
-  return types[t] || t;
-};
-
-const getDaysRemainingText = (date) => {
-  if (!date) return '—';
-  const now = new Date();
-  const end = new Date(date);
-  const diff = Math.ceil((end - now) / (1000 * 3600 * 24));
-  
-  if (diff < 0) return 'Expiré';
-  if (diff === 0) return "Aujourd'hui";
-  if (diff === 1) return 'Demain';
-  return `${diff} jours`;
-};
-
-const getDaysRemainingClass = (date) => {
-  if (!date) return 'pill-neutral';
-  const now = new Date();
-  const end = new Date(date);
-  const diff = Math.ceil((end - now) / (1000 * 3600 * 24));
-  
-  if (diff < 0) return 'pill-danger';
-  if (diff <= 7) return 'pill-warning';
-  if (diff <= 30) return 'pill-info';
-  return 'pill-success';
-};
-
-const getRowClass = (date) => {
-  if (!date) return '';
-  const now = new Date();
-  const end = new Date(date);
-  const diff = Math.ceil((end - now) / (1000 * 3600 * 24));
-  
-  if (diff < 0) return 'row-expired';
-  if (diff <= 30) return 'row-warning';
-  return '';
-};
-
-const getDateFieldClass = (date) => {
-  if (!date) return '';
-  const now = new Date();
-  const end = new Date(date);
-  const diff = Math.ceil((end - now) / (1000 * 3600 * 24));
-  return diff <= 30 ? 'date-warning' : '';
-};
-
-const handleInsurerChange = () => {
-  showNewInsurerInput.value = form.value.insurerId === "NEW";
-};
-
-const onVehicleChange = () => {
-  // Réinitialiser l'assureur quand le véhicule change
-  if (form.value.vehicleId && hasActiveInsurance(form.value.vehicleId)) {
-    const activeIns = getActiveInsurance(form.value.vehicleId);
-    // Pré-remplir avec l'assureur actuel si disponible
-    if (activeIns && activeIns.insurerId) {
-      form.value.insurerId = activeIns.insurerId;
-    }
-  }
-};
-
-const resetDateFilter = () => {
-  filterDates.value = { from: "", to: "" };
-};
-
-const resetForm = () => {
-  form.value = { vehicleId: "", insurerId: "", insurancesType: "TIERS", premium: 0, policyNo: "" };
-  durationValue.value = 12;
-  durationUnit.value = "months";
-  dates.value = { start: new Date().toISOString().split('T')[0], end: "" };
-  submitted.value = false;
-};
-
-const clearMessages = () => { 
-  error.value = ""; 
-  successMessage.value = ""; 
-};
-
-// --- LIFECYCLE ---
-onMounted(load);
-
-watch([searchQuery, filterStatus, filterDates], () => {
+watch([filteredItems, fromDate, toDate, searchPlate, statusFilter], () => {
   currentPage.value = 1;
 });
+
+watch(() => form.startAt, calculateEndDate);
+watch(() => form.durationValue, calculateEndDate);
+watch(() => form.durationUnit, calculateEndDate);
 </script>
 
 <style scoped>
-/* Variables CSS */
-:root {
-  --primary: #3b82f6;
-  --primary-light: #60a5fa;
-  --primary-dark: #2563eb;
-  --primary-bg: #eff6ff;
-  --secondary: #8b5cf6;
-  --success: #10b981;
-  --success-light: #34d399;
-  --success-bg: #ecfdf5;
-  --warning: #f59e0b;
-  --warning-light: #fbbf24;
-  --warning-bg: #fffbeb;
-  --danger: #ef4444;
-  --danger-light: #f87171;
-  --danger-bg: #fef2f2;
-  --info: #0ea5e9;
-  --gray-50: #f8fafc;
-  --gray-100: #f1f5f9;
-  --gray-200: #e2e8f0;
-  --gray-300: #cbd5e1;
-  --gray-400: #94a3b8;
-  --gray-500: #64748b;
-  --gray-600: #475569;
-  --gray-700: #334155;
-  --gray-800: #1e293b;
-  --gray-900: #0f172a;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  --radius-sm: 0.375rem;
-  --radius: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
-}
-
-/* Base */
-.dashboard-container {
+.insurance {
+  max-width: 1400px;
+  margin: 0 auto;
   padding: 24px;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: #f8fafc;
   min-height: 100vh;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  color: var(--gray-800);
-  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1e293b;
 }
 
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(15, 23, 42, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  padding: 20px;
-  backdrop-filter: blur(5px);
-}
-
-.modal-content {
-  background: white;
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  animation: slideUp 0.3s ease;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--gray-200);
-}
-
-.modal-header {
+/* ==================== HEADER ==================== */
+.header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 2px solid var(--gray-100);
-  background: var(--gray-50);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--gray-900);
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: var(--gray-500);
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
-}
-
-.modal-close:hover {
-  background: var(--gray-200);
-  color: var(--gray-700);
-}
-
-.modal-body {
-  padding: 24px;
-}
-
-.modal-form .form-group {
-  margin-bottom: 20px;
-}
-
-.modal-form label {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--gray-700);
-  margin-bottom: 8px;
-}
-
-.modal-info {
-  background: var(--gray-50);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-top: 24px;
-  border: 1px solid var(--gray-200);
-}
-
-.modal-info .info-label {
-  display: block;
-  font-size: 12px;
-  color: var(--gray-500);
-  margin-bottom: 4px;
-}
-
-.modal-info .info-value {
-  display: block;
-  font-weight: 600;
-  color: var(--gray-800);
-  margin-bottom: 12px;
-}
-
-.modal-info .deadline {
-  color: var(--primary);
-}
-
-.modal-info .info-warning {
-  display: block;
-  color: var(--danger);
-  font-weight: 600;
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: var(--danger-bg);
-  border-radius: var(--radius);
-  border: 1px solid var(--danger-light);
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 20px 24px;
-  border-top: 2px solid var(--gray-100);
-  background: var(--gray-50);
-}
-
-.btn-cancel {
-  padding: 10px 20px;
-  border: 2px solid var(--gray-300);
-  background: white;
-  border-radius: var(--radius);
-  font-weight: 600;
-  color: var(--gray-700);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-cancel:hover {
-  background: var(--gray-100);
-  border-color: var(--gray-400);
-}
-
-.btn-save {
-  padding: 10px 20px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  color: white;
-  border: none;
-  border-radius: var(--radius);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-save:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.btn-save:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Notifications */
-.notification {
-  position: fixed;
-  top: 24px;
-  right: 24px;
-  z-index: 9999;
-  padding: 16px 20px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-width: 320px;
-  max-width: 400px;
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  animation: slideDown 0.3s ease;
-}
-
-.notification-success {
-  background: linear-gradient(135deg, var(--success-bg) 0%, rgba(16, 185, 129, 0.1) 100%);
-  border-left: 4px solid var(--success);
-  color: #065f46;
-}
-
-.notification-error {
-  background: linear-gradient(135deg, var(--danger-bg) 0%, rgba(239, 68, 68, 0.1) 100%);
-  border-left: 4px solid var(--danger);
-  color: #991b1b;
-}
-
-.noti-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-}
-
-.status-icon {
-  font-size: 20px;
-}
-
-.noti-text {
-  flex: 1;
-}
-
-.noti-title {
-  font-weight: 700;
-  font-size: 14px;
-  margin-bottom: 2px;
-}
-
-.noti-message {
-  font-size: 14px;
-  margin: 0;
-}
-
-.notification-close {
-  background: none;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  font-size: 20px;
-  opacity: 0.7;
-  padding: 4px;
-  border-radius: 50%;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.notification-close:hover {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.05);
-}
-
-/* Header */
-.dashboard-header {
-  background: white;
-  border-radius: var(--radius-lg);
-  padding: 24px;
   margin-bottom: 24px;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--gray-200);
 }
 
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 24px;
-}
-
-.header-main {
-  flex: 1;
-}
-
-.title {
+.header-left h1 {
   font-size: 28px;
-  font-weight: 800;
-  color: var(--gray-900);
-  margin: 0 0 8px 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 4px;
 }
 
-.title-icon {
-  font-size: 32px;
-}
-
-.subtitle {
-  color: var(--gray-500);
+.date {
   font-size: 14px;
+  color: #64748b;
   margin: 0;
 }
 
 .header-actions {
-  flex-shrink: 0;
+  display: flex;
+  gap: 12px;
 }
 
-.refresh-btn {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  color: white;
-  border: none;
-  border-radius: var(--radius);
-  padding: 12px 24px;
-  font-weight: 600;
+/* ==================== BOUTONS ==================== */
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  display: flex;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.3s;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
-.refresh-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-}
-
-.refresh-btn:disabled {
-  opacity: 0.7;
+.btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.refresh-icon {
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-outline {
+  background: white;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.btn-text {
+  background: transparent;
+  border: none;
+  color: #64748b;
+}
+
+.btn-text:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.btn-icon {
   font-size: 16px;
 }
 
-.rotating .refresh-icon {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* KPI Cards */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
-  margin-bottom: 32px;
-}
-
-.kpi-card {
-  padding: 24px;
-  border-radius: var(--radius-lg);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.kpi-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
-}
-
-.kpi-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-}
-
-.kpi-card.premium {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.9) 0%, rgba(37, 99, 235, 0.9) 100%);
-  color: white;
-}
-
-.kpi-card.warning {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.9) 0%, rgba(217, 119, 6, 0.9) 100%);
-  color: white;
-}
-
-.kpi-card.danger {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.9) 0%, rgba(220, 38, 38, 0.9) 100%);
-  color: white;
-}
-
-.kpi-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.kpi-icon-wrapper {
-  background: rgba(255, 255, 255, 0.2);
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  display: flex;
+.btn-icon-only {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.kpi-text {
-  flex: 1;
+.btn-icon-only:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
 }
 
-.label {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.9;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-  display: block;
+.btn-icon-only:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
-.value {
-  font-size: 36px;
-  font-weight: 800;
-  margin: 0;
-  line-height: 1;
-}
-
-.kpi-trend {
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-  padding-top: 12px;
-}
-
-.trend-text {
-  font-size: 11px;
-  opacity: 0.8;
-  font-weight: 500;
-}
-
-/* Form Section */
-.glass-form {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
-  backdrop-filter: blur(10px);
-}
-
-.form-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 24px 24px 0;
+/* ==================== KPI ==================== */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
   margin-bottom: 24px;
 }
 
-.form-header-icon {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+.kpi-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.kpi-icon {
   width: 48px;
   height: 48px;
   border-radius: 12px;
@@ -1905,1089 +851,419 @@ watch([searchQuery, filterStatus, filterDates], () => {
   align-items: center;
   justify-content: center;
   font-size: 24px;
-  color: white;
 }
 
-.form-header-text h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--gray-900);
-  margin: 0 0 4px 0;
+.kpi-icon.blue { background: #eff6ff; color: #2563eb; }
+.kpi-icon.indigo { background: #eef2ff; color: #4f46e5; }
+.kpi-icon.orange { background: #fff7ed; color: #ea580c; }
+.kpi-icon.red { background: #fef2f2; color: #dc2626; }
+
+.kpi-content {
+  flex: 1;
 }
 
-.form-header-text p {
-  color: var(--gray-500);
-  font-size: 14px;
+.kpi-label {
+  display: block;
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.kpi-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.kpi-trend {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ==================== CARTES ==================== */
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.card-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.form-body {
-  padding: 0 24px 24px;
+.badge {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.form-grid {
+/* ==================== FORMULAIRE ==================== */
+.form {
+  max-width: 800px;
+}
+
+.form-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.form-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--gray-700);
-  display: flex;
-  align-items: center;
   gap: 6px;
 }
 
-.label-icon {
-  opacity: 0.7;
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
 }
 
-.select-wrapper {
-  position: relative;
+.required {
+  color: #ef4444;
+  margin-left: 2px;
 }
 
-.select-filled {
-  width: 100%;
-  padding: 12px 16px;
-  border: 2px solid var(--gray-200);
-  border-radius: var(--radius);
+.form-group input,
+.form-group select {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   font-size: 14px;
-  transition: all 0.3s;
-  appearance: none;
   background: white;
-  color: var(--gray-800);
+  transition: all 0.2s;
 }
 
-.select-filled:focus {
+.form-group input:focus,
+.form-group select:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.select-arrow {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--gray-500);
-  font-size: 12px;
+.form-group input.error,
+.form-group select.error {
+  border-color: #ef4444;
+  background: #fef2f2;
 }
 
-.opt-new {
-  color: var(--primary);
-  font-weight: 600;
+.form-group input.readonly {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
 }
 
-.input-error {
-  border-color: var(--danger) !important;
+.input-group {
+  display: flex;
+  gap: 8px;
 }
 
-.input-with-prefix {
-  position: relative;
-}
-
-.input-prefix {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--gray-500);
-  font-weight: 600;
-}
-
-.input-with-prefix .modern-input {
-  padding-left: 60px;
+.input-group input {
+  flex: 1;
 }
 
 .duration-group {
   display: flex;
-  flex-direction: column;
   gap: 8px;
 }
 
-.duration-input {
-  display: flex;
-  gap: 8px;
-}
-
-.num-input {
-  width: 80px;
-  text-align: center;
-}
-
-.unit-select {
+.duration-group input {
   width: 100px;
 }
 
-.date-start {
+.duration-group select {
   flex: 1;
 }
 
-.date-display {
-  position: relative;
-}
-
-.date-display-field {
-  background: var(--gray-50);
-  cursor: not-allowed;
-}
-
-.date-info {
-  display: block;
-  font-size: 11px;
-  color: var(--gray-500);
-  margin-top: 4px;
-}
-
-.date-warning {
-  border-color: var(--warning);
-  background: var(--warning-bg);
-}
-
-.input-with-suffix {
-  position: relative;
-}
-
-.input-suffix {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--gray-500);
-  font-size: 14px;
-}
-
-/* Indicateur d'assurance en cours */
-.insurance-status-info {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: var(--radius);
-}
-
-.warning-status {
-  background: var(--warning-bg);
-  border: 1px solid var(--warning-light);
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.success-status {
-  background: var(--success-bg);
-  border: 1px solid var(--success-light);
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.status-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-}
-
-.status-details {
-  flex: 1;
-}
-
-.status-title {
-  font-weight: 600;
-  font-size: 14px;
-  margin: 0 0 4px 0;
-  color: var(--gray-800);
-}
-
-.status-description {
+.field-hint {
   font-size: 12px;
-  color: var(--gray-600);
-  margin: 0 0 8px 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-top: 2px;
 }
 
-.status-note {
-  font-size: 11px;
-  color: var(--gray-500);
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.field-hint.warning {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
 }
 
-.note-icon {
-  font-size: 12px;
+.field-hint.success {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
 }
 
-/* Nouvel assureur */
-.new-insurer-form {
-  background: var(--gray-50);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-top: 16px;
-  border: 1px solid var(--gray-200);
+.form-actions {
+  margin-top: 24px;
 }
 
-.new-insurer-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.new-insurer-icon {
-  color: var(--primary);
-  font-size: 18px;
-}
-
-.new-insurer-header h4 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--gray-700);
-  margin: 0;
-}
-
-.new-insurer-body {
-  display: flex;
+/* ==================== FILTRES ==================== */
+.filters {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
+  margin-bottom: 24px;
 }
 
-.insurer-name-input {
-  flex: 1;
-}
-
-.btn-save-insurer {
-  background: linear-gradient(135deg, var(--success) 40%, var(--success-light) 100%);
-  color: black;
-  border: none;
-  border-radius: var(--radius);
-  padding: 12px 20px;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.3s;
-}
-
-.btn-save-insurer:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
-
-.btn-save-insurer:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Bouton de soumission */
-.form-footer {
-  padding-top: 24px;
-  border-top: 1px solid var(--gray-200);
-}
-
-/* Le bouton principal "Valider" */
-.btn-submit {
-  background: linear-gradient(135deg, #3a8dff 0%, #0056b3 100%);
-  color: black; /* Écriture noire demandée */
-  border: none;
-  border-radius: 12px; /* Un arrondi moderne */
-  padding: 16px 32px;
-  font-weight: 700;
-  font-size: 16px;
-  cursor: pointer;
-  width: 100%;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-}
-
-/* Effet de survol attractif */
-.btn-submit:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.5);
-  filter: brightness(1.1);
-}
-
-/* État désactivé pour le bouton principal */
-.btn-submit:disabled {
-  background: #cbd5e1;
-  color: #64748b;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-/* Style spécifique pour les boutons d'action dans le tableau quand ils sont verrouillés */
-.btn-locked {
-  background: #f1f5f9 !important;
-  color: #94a3b8 !important;
-  cursor: not-allowed !important;
-  opacity: 0.7;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Animation de l'icône de cadenas */
-.btn-locked span {
-  filter: grayscale(1);
-}
-
-
-.btn-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.btn-icon {
-  font-size: 18px;
-}
-
-.loading-spinner {
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: white;
-  animation: spin 1s linear infinite;
-}
-
-/* Table Section */
-.glass-table {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
-}
-
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--gray-200);
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.table-header-left {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-
-.table-title-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.table-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--gray-900);
-  margin: 0;
-}
-
-.table-count {
-  background: var(--primary-bg);
-  color: var(--primary);
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.table-filters {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.period-filter {
-  background: var(--gray-100);
-  border-radius: var(--radius);
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid var(--gray-200);
-}
-
-.period-input {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.period-input label {
-  font-size: 12px;
-  color: var(--gray-600);
-  font-weight: 600;
-}
-
-.date-input {
-  padding: 6px 8px;
-  border: 1px solid var(--gray-300);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  min-width: 100px;
-}
-
-.btn-clear {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid var(--danger-light);
-  border-radius: var(--radius-sm);
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  transition: all 0.2s;
-}
-
-.btn-clear:hover {
-  background: var(--danger);
-  color: white;
-}
-
-.clear-icon {
-  font-size: 14px;
-}
-
-.table-header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.search-box {
-  position: relative;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--gray-400);
-  pointer-events: none;
-}
-
-.search-input {
-  padding: 10px 16px 10px 36px;
-  border: 2px solid var(--gray-200);
-  border-radius: var(--radius);
-  font-size: 14px;
-  width: 240px;
-  transition: all 0.3s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.status-filter-wrapper {
-  position: relative;
-}
-
-.status-filter {
-  padding: 10px 36px 10px 16px;
-  border: 2px solid var(--gray-200);
-  border-radius: var(--radius);
+.filters input,
+.filters select {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   font-size: 14px;
   background: white;
-  color: var(--gray-800);
-  cursor: pointer;
-  appearance: none;
-  min-width: 180px;
 }
 
-.status-filter:focus {
-  outline: none;
-  border-color: var(--primary);
-}
-
-.table-responsive {
+/* ==================== TABLEAU ==================== */
+.table-container {
   overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 16px;
 }
 
-.dashboard-table {
+table {
   width: 100%;
   border-collapse: collapse;
   min-width: 1000px;
 }
 
-.dashboard-table th {
-  background: var(--gray-50);
-  padding: 16px 20px;
+th {
   text-align: left;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--gray-600);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 2px solid var(--gray-200);
-  white-space: nowrap;
-}
-
-.dashboard-table td {
-  padding: 20px;
-  border-bottom: 1px solid var(--gray-100);
-  vertical-align: middle;
-}
-
-.dashboard-table tbody tr {
-  transition: all 0.2s;
-}
-
-.dashboard-table tbody tr:hover {
-  background: var(--gray-50);
-}
-
-.row-expired {
-  background: linear-gradient(90deg, var(--danger-bg) 0%, rgba(239, 68, 68, 0.05) 100%);
-}
-
-.row-warning {
-  background: linear-gradient(90deg, var(--warning-bg) 0%, rgba(245, 158, 11, 0.05) 100%);
-}
-
-/* Cellules du tableau */
-.vehicle-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.vehicle-icon {
-  font-size: 20px;
-  opacity: 0.7;
-}
-
-.vehicle-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.plate-tag {
-  background: var(--gray-900);
-  color: blue;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  display: inline-block;
-}
-
-.vehicle-type {
-  font-size: 11px;
-  color: var(--gray-500);
-}
-
-.vehicle-status {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 10px;
-  display: inline-block;
-}
-
-.status-active {
-  background: var(--success-bg);
-  color: var(--success);
-  border: 1px solid var(--success-light);
-}
-
-.status-warning {
-  background: var(--warning-bg);
-  color: var(--warning);
-  border: 1px solid var(--warning-light);
-}
-
-.status-inactive {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid var(--danger-light);
-}
-
-.insurer-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.insurer-name {
-  font-weight: 600;
-  color: var(--gray-800);
-}
-
-.policy-number {
-  font-size: 11px;
-  color: var(--gray-500);
-}
-
-.period-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.period-dates {
+  padding: 16px;
+  background: #f8fafc;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--gray-700);
-}
-
-.period-duration {
-  font-size: 11px;
-  color: var(--gray-500);
-}
-
-.status-pill {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border: 2px solid;
-  white-space: nowrap;
-}
-
-.pill-success {
-  background: var(--success-bg);
-  color: var(--success);
-  border-color: rgba(16, 185, 129, 0.2);
-}
-
-.pill-info {
-  background: var(--primary-bg);
-  color: var(--primary);
-  border-color: rgba(59, 130, 246, 0.2);
-}
-
-.pill-warning {
-  background: var(--warning-bg);
-  color: var(--warning);
-  border-color: rgba(245, 158, 11, 0.2);
-}
-
-.pill-danger {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border-color: rgba(239, 68, 68, 0.2);
-}
-
-.pill-neutral {
-  background: var(--gray-100);
-  color: var(--gray-600);
-  border-color: var(--gray-200);
-}
-
-.premium-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.premium-value {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--gray-800);
-}
-
-/* Modification status */
-.modification-status {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.modify-allowed {
-  color: var(--success);
-  font-size: 12px;
   font-weight: 600;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.modify-locked {
-  color: var(--danger);
-  font-size: 12px;
-  font-weight: 600;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.status-icon {
+td {
+  padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
   font-size: 14px;
-  margin-right: 4px;
 }
 
-.status-text {
-  font-weight: 700;
+tr:last-child td {
+  border-bottom: none;
 }
 
-.status-time {
-  font-size: 10px;
-  opacity: 0.8;
+tbody tr:hover {
+  background: #f8fafc;
+}
+
+.cell-primary {
+  font-weight: 500;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+.cell-secondary {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ==================== STATUTS ==================== */
+.status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
   font-weight: 500;
 }
 
-/* Actions */
+.status.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status.expired {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.badge-modifiable {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badge-modifiable.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-modifiable.error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* ==================== ACTIONS ==================== */
 .action-buttons {
   display: flex;
   gap: 8px;
 }
 
-.action-btn {
-  background: none;
-  border: 2px solid var(--gray-200);
-  border-radius: var(--radius);
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.action-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-}
-
-.btn-edit {
-  color: var(--primary);
-  border-color: var(--primary-light);
-  background: var(--primary-bg);
-}
-
-.btn-edit:hover:not(:disabled) {
-  background: var(--primary);
-  color: white;
-}
-
-.btn-delete {
-  color: var(--danger);
-  border-color: var(--danger-light);
-  background: var(--danger-bg);
-}
-
-.btn-delete:hover:not(:disabled) {
-  background: var(--danger);
-  color: white;
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none !important;
-}
-
-.action-icon {
-  font-size: 14px;
-}
-
-.action-text {
-  font-size: 12px;
-}
-
-.no-results {
-  text-align: center;
-  padding: 60px 20px !important;
-}
-
-.no-results-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  color: var(--gray-400);
-}
-
-.no-results-icon {
-  font-size: 48px;
-  opacity: 0.5;
-}
-
-.no-results p {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-/* Pagination */
-.table-footer {
+/* ==================== PAGINATION ==================== */
+.pagination {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-top: 1px solid var(--gray-200);
-  flex-wrap: wrap;
-  gap: 16px;
-  background: var(--gray-50);
+  margin-top: 16px;
 }
 
-.pagination-info {
+.page-info {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.page-buttons {
   display: flex;
-  align-items: center;
   gap: 8px;
 }
 
-.pagination-text {
-  font-size: 14px;
-  color: var(--gray-600);
-}
-
-.pagination-count {
-  color: var(--gray-400);
-  font-size: 13px;
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.pagination-btn {
+.page-buttons button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
   background: white;
-  border: 2px solid var(--gray-200);
-  border-radius: var(--radius);
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--gray-700);
+  border-radius: 6px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
+  font-size: 16px;
 }
 
-.pagination-btn:hover:not(:disabled) {
-  background: var(--gray-50);
-  border-color: var(--gray-300);
+.page-buttons button:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
 }
 
-.pagination-btn:disabled {
+.page-buttons button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.btn-arrow {
-  font-size: 16px;
-}
-
-.page-numbers {
-  display: flex;
-  gap: 4px;
-}
-
-.page-number {
-  background: white;
-  border: 2px solid var(--gray-200);
-  border-radius: var(--radius);
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ==================== MESSAGES ==================== */
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
   font-size: 14px;
-  font-weight: 600;
-  color: var(--gray-700);
-  cursor: pointer;
-  transition: all 0.2s;
+  margin-top: 16px;
 }
 
-.page-number:hover {
-  background: var(--gray-50);
-  border-color: var(--gray-300);
+.alert.error {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
-.page-number.active {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  color: white;
-  border-color: var(--primary);
+.alert.success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
 }
 
-/* Animations */
-@keyframes slideDown {
-  from {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+.empty {
+  text-align: center;
+  padding: 48px;
+  color: #94a3b8;
+  font-style: italic;
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(40px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+/* ==================== CHARGEMENT ==================== */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  margin-right: 8px;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  transform: translateX(-10px);
-  opacity: 0;
-}
-
-.modal-enter-active,
-.modal-leave-active {
-  transition: all 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-/* Responsive */
+/* ==================== RESPONSIVE ==================== */
 @media (max-width: 1024px) {
-  .form-grid {
-    grid-template-columns: 1fr 1fr;
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .filters {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 768px) {
-  .dashboard-container {
+  .insurance {
     padding: 16px;
   }
-  
-  .header-content {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-  
-  .title {
-    font-size: 24px;
-  }
-  
-  .kpi-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-  
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .duration-input {
-    flex-direction: column;
-  }
-  
-  .num-input, .unit-select, .date-start {
-    width: 100%;
-  }
-  
-  .table-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-  
-  .table-header-left {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-  
-  .period-filter {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .period-input {
-    justify-content: space-between;
-  }
-  
-  .table-header-right {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .search-input {
-    width: 100%;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-  }
-  
-  .table-footer {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-  
-  .pagination-controls {
-    justify-content: center;
-  }
-  
-  .page-numbers {
-    display: none;
-  }
-  
-  .modal-content {
-    margin: 10px;
-    max-height: 85vh;
-  }
-}
 
-@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .btn {
+    flex: 1;
+  }
+
   .kpi-grid {
     grid-template-columns: 1fr;
   }
-  
-  .new-insurer-body {
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .pagination {
     flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
   }
 }
 </style>

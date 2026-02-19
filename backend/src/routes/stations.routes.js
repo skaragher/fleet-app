@@ -3,14 +3,25 @@ import { prisma } from "../prisma.js";
 import { auth } from "../middleware/auth.js";
 import { parse, stationSchema, tankSchema } from "../validators.js";
 import { errorHandler } from "../middleware/errors.js";
+import { buildUserScope } from "../utils/userScope.js";
 
 const router = Router();
 
 // --- STATIONS ---
 
-router.get("/", auth(), async (_req, res, next) => {
+router.get("/", auth(), async (req, res, next) => {
   try {
+    const scope = await buildUserScope(req.user);
+    if (scope.role === "FLEET_MANAGER") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const where = {};
+    if (scope.role === "STATION_MANAGER") {
+      where.id = { in: scope.assignedStationIds.length ? scope.assignedStationIds : ["__none__"] };
+    }
+
     const stations = await prisma.station.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       include: { tanks: true }
     });
@@ -18,7 +29,7 @@ router.get("/", auth(), async (_req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post("/", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER", "FUEL_OPERATOR"]), async (req, res, next) => {
+router.post("/", auth(["SUPER_ADMIN","ADMIN", "FUEL_OPERATOR"]), async (req, res, next) => {
   try {
     const data = parse(stationSchema, req.body);
     const station = await prisma.station.create({ data });
@@ -26,7 +37,7 @@ router.post("/", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER", "FUEL_OPERATOR"])
   } catch (e) { next(e); }
 });
 //modifier une station
-router.put("/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req, res, next) => {
+router.put("/:id", auth(["SUPER_ADMIN","ADMIN"]), async (req, res, next) => {
   try {
     const { id } = req.params;
     const data = parse(stationSchema, req.body); // Valide name, location, address, phone
@@ -65,7 +76,7 @@ router.delete("/:id", auth(["SUPER_ADMIN","ADMIN"]), async (req, res, next) => {
 // --- TANKS (CUVES) ---
 
 // Création d'une cuve
-router.post("/:stationId/tanks", auth(["SUPER_ADMIN","ADMIN", "FUEL_OPERATOR", "FLEET_MANAGER"]), async (req, res, next) => {
+router.post("/:stationId/tanks", auth(["SUPER_ADMIN","ADMIN", "FUEL_OPERATOR"]), async (req, res, next) => {
   try {
     const { stationId } = req.params;
     
@@ -86,7 +97,7 @@ router.post("/:stationId/tanks", auth(["SUPER_ADMIN","ADMIN", "FUEL_OPERATOR", "
 });
 
 // Mise à jour d'une cuve
-router.put("/tanks/:id", auth(["SUPER_ADMIN","ADMIN", "FUEL_OPERATOR", "FLEET_MANAGER"]), async (req, res, next) => {
+router.put("/tanks/:id", auth(["SUPER_ADMIN","ADMIN", "FUEL_OPERATOR"]), async (req, res, next) => {
   const { id } = req.params;
   try {
     // On valide les données avec le même schéma que la création

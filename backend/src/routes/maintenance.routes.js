@@ -4,12 +4,22 @@ import { prisma } from "../prisma.js";
 import { auth } from "../middleware/auth.js";
 import { parse, maintenanceSchema } from "../validators.js";
 import { errorHandler } from "../middleware/errors.js";
+import { buildUserScope } from "../utils/userScope.js";
 
 const router = Router();
 
-router.get("/", auth(), async (_req, res, next) => {
+router.get("/", auth(), async (req, res, next) => {
   try {
-    const items = await prisma.maintenance.findMany({ orderBy: { createdAt: "desc" } });
+    const scope = await buildUserScope(req.user);
+    const where = {};
+
+    if (scope.role === "DRIVER") {
+      where.vehicleId = scope.assignedVehicleId || "__none__";
+    } else if (scope.role === "STATION_MANAGER") {
+      where.vehicleId = { in: scope.allowedVehicleIds.length ? scope.allowedVehicleIds : ["__none__"] };
+    }
+
+    const items = await prisma.maintenance.findMany({ where, orderBy: { createdAt: "desc" } });
     res.json(items);
   } catch (e) { next(e); }
 });

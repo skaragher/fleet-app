@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../prisma.js";
 import { auth } from "../middleware/auth.js";
 import { parse, supplySchema } from "../validators.js";
+import { buildUserScope } from "../utils/userScope.js";
 
 const router = Router();
 
@@ -44,8 +45,20 @@ router.get("/supplies", auth(), async (req, res, next) => {
     }
     
     // Filtre par station
-    if (stationId) {
-      where.stationId = stationId;
+    if (stationId) where.stationId = stationId;
+
+    const scope = await buildUserScope(req.user);
+    if (scope.role === "FLEET_MANAGER") {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden"
+      });
+    }
+    if (scope.role === "STATION_MANAGER") {
+      where.stationId = { in: scope.assignedStationIds.length ? scope.assignedStationIds : ["__none__"] };
+    } else if (scope.role === "DRIVER") {
+      // Un driver ne gère pas les approvisionnements de station
+      where.stationId = "__none__";
     }
     
     // Filtre par fournisseur (recherche partielle)
@@ -140,12 +153,20 @@ router.get("/supplies", auth(), async (req, res, next) => {
 // CRÉER UN NOUVEL APPROVISIONNEMENT
 // ============================================
 
-router.post("/supplies", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_MANAGER"]), async (req, res, next) => {
+router.post("/supplies", auth(["SUPER_ADMIN","ADMIN","STATION_MANAGER"]), async (req, res, next) => {
   try {
+    const scope = await buildUserScope(req.user);
     console.log("POST /supplies - Création d'un approvisionnement");
     console.log("Données reçues:", req.body);
     
     const data = parse(supplySchema, req.body);
+
+    if (scope.role === "STATION_MANAGER" && !scope.assignedStationIds.includes(data.stationId)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: station non assignee"
+      });
+    }
     
     const result = await prisma.$transaction(async (tx) => {
       // 1. Vérifier que la cuve existe
@@ -261,13 +282,21 @@ router.post("/supplies", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_M
 // MODIFIER UN APPROVISIONNEMENT
 // ============================================
 
-router.put("/supplies/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_MANAGER"]), async (req, res, next) => {
+router.put("/supplies/:id", auth(["SUPER_ADMIN","ADMIN","STATION_MANAGER"]), async (req, res, next) => {
   try {
+    const scope = await buildUserScope(req.user);
     const { id } = req.params;
     console.log(`PUT /supplies/${id} - Modification d'un approvisionnement`);
     console.log("Données reçues:", req.body);
     
     const data = parse(supplySchema, req.body);
+
+    if (scope.role === "STATION_MANAGER" && !scope.assignedStationIds.includes(data.stationId)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: station non assignee"
+      });
+    }
     
     // 1. Vérifier que l'approvisionnement existe
     const existingSupply = await prisma.fuelSupply.findUnique({
@@ -436,7 +465,7 @@ router.put("/supplies/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATIO
 // SUPPRIMER UN APPROVISIONNEMENT
 // ============================================
 
-router.delete("/supplies/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req, res, next) => {
+router.delete("/supplies/:id", auth(["SUPER_ADMIN","ADMIN"]), async (req, res, next) => {
   try {
     const { id } = req.params;
     console.log(`DELETE /supplies/${id} - Suppression d'un approvisionnement`);

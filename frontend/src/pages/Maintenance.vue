@@ -148,7 +148,12 @@ const initialForm = { vehicleId: "", maintenanceType: "VIDANGE", description: ""
 const form = ref({ ...initialForm });
 const completionForm = ref({ id: null, vehicleId: "", cost: null, comment: "" });
 
-const activeVehicles = computed(() => vehicles.value.filter(v => v.status === 'EN_SERVICE' || v.status === 'ACTIF'));
+const normalizeVehicleStatus = (status) => String(status || "").trim().toUpperCase();
+const isVehicleInService = (vehicle) => {
+  const s = normalizeVehicleStatus(vehicle?.status);
+  return s === "EN_SERVICE" || s === "EN SERVICE" || s === "ACTIF" || s === "ACTIVE";
+};
+const activeVehicles = computed(() => vehicles.value.filter(isVehicleInService));
 const selectedVehicle = computed(() => vehicles.value.find(v => v.id === form.value.vehicleId));
 const totalPages = computed(() => Math.ceil(items.value.length / itemsPerPage) || 1);
 const paginatedItems = computed(() => items.value.slice((currentPage.value - 1) * itemsPerPage, currentPage.value * itemsPerPage));

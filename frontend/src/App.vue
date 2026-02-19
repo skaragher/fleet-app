@@ -17,7 +17,7 @@
             <span class="logo-icon">⛽</span>
           </div>
           <div class="brand-text">
-            <h1 class="brand-title">FLOTTECH</h1>
+            <h1 class="brand-title">FLEETENERGY</h1>
             <p class="brand-subtitle">MANAGER</p>
           </div>
         </div>
@@ -53,7 +53,14 @@
               </div>
             </div>
             <div class="user-avatar" :class="getRoleClass(auth.user.role)">
-              {{ getUserInitials(auth.user.name) }}
+              <img
+                v-if="!topbarAvatarLoadError && userAvatarUrl"
+                :src="userAvatarUrl"
+                alt="Avatar"
+                class="user-avatar-image"
+                @error="topbarAvatarLoadError = true"
+              />
+              <span v-else>{{ getUserInitials(auth.user.name) }}</span>
             </div>
           </div>
           <button class="btn-logout" @click="logout" title="Déconnexion">
@@ -390,6 +397,36 @@ const route = useRoute();
 const isMenuOpen = ref(false);
 const assignedVehicle = ref(null);
 const assignedStation = ref(null);
+const topbarAvatarLoadError = ref(false);
+
+const getApiBaseUrl = () =>
+  (import.meta.env.VITE_API_URL || "http://localhost:3000/api").replace(/\/api\/?$/, "");
+
+const buildInitialAvatarDataUrl = (name) => {
+  const initials = (name || "U")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "U";
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="100%" height="100%" fill="#dbeafe"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" fill="#1e3a8a">${initials}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
+const resolveAvatarUrl = (user) => {
+  const src = user?.avatarUrl;
+  if (!src) return buildInitialAvatarDataUrl(user?.name);
+  if (String(src).startsWith("http")) return src;
+  if (String(src).startsWith("/uploads/avatars/")) {
+    const filename = String(src).split("/").pop();
+    return `${getApiBaseUrl()}/api/auth/avatar/${filename}`;
+  }
+  return `${getApiBaseUrl()}${src}`;
+};
+
+const userAvatarUrl = computed(() => resolveAvatarUrl(auth.user));
 
 // Watch route changes to close menu on mobile
 watch(() => route.path, () => {
@@ -397,6 +434,13 @@ watch(() => route.path, () => {
     isMenuOpen.value = false;
   }
 });
+
+watch(
+  () => auth.user?.avatarUrl,
+  () => {
+    topbarAvatarLoadError.value = false;
+  }
+);
 
 // === COMPUTED PROPERTIES POUR LES RÔLES ===
 const isSuperAdmin = computed(() => auth.user?.role === 'SUPER_ADMIN');
@@ -423,17 +467,17 @@ const canEditVehicles = computed(() => {
 });
 
 const canAccessStations = computed(() => {
-  return isSuperAdmin.value || isFleetManager.value || isStationManager.value || 
+  return isSuperAdmin.value || isStationManager.value || 
          isViewer.value;
 });
 
 const canEditStations = computed(() => {
-  return isSuperAdmin.value || isFleetManager.value || 
+  return isSuperAdmin.value || 
          (isStationManager.value && hasPermission('edit_station'));
 });
 
 const canManageFuel = computed(() => {
-  return isSuperAdmin.value || isFleetManager.value || isStationManager.value || 
+  return isSuperAdmin.value || isStationManager.value || 
          isVehicleManager.value || hasPermission('manage_fuel');
 });
 
@@ -727,6 +771,13 @@ onMounted(async () => {
   font-size: 0.875rem;
   position: relative;
   overflow: hidden;
+}
+
+.user-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .user-avatar::after {

@@ -47,7 +47,7 @@
       </div>
 
       <!-- KPI Grid -->
-      <div class="kpi-grid">
+      <div v-if="!isStationManager" class="kpi-grid">
         <div class="kpi-card glass blue">
           <div class="kpi-icon">🚚</div>
           <div class="kpi-content">
@@ -56,7 +56,7 @@
             <div class="kpi-subtext">{{ activeVehiclesCount }} en service</div>
           </div>
         </div>
-        <div class="kpi-card glass green">
+        <div v-if="!isFleetManager" class="kpi-card glass green">
           <div class="kpi-icon">⛽</div>
           <div class="kpi-content">
             <span class="label">Stations</span>
@@ -89,9 +89,137 @@
     <div class="kpi-subtext">{{ expiredInspections.length }} en retard</div>
     <div class="kpi-subtext">{{ urgentInspections.length }} urgents</div>
   </div>
-</div>
+        </div>
       </div>
 
+      <div v-else class="kpi-grid">
+        <div class="kpi-card glass green">
+          <div class="kpi-icon">⛽</div>
+          <div class="kpi-content">
+            <span class="label">Stations</span>
+            <h3 class="value">{{ dashboardData?.kpis?.stations || 0 }}</h3>
+            <div class="kpi-subtext">{{ tanks.length }} cuves suivies</div>
+          </div>
+        </div>
+        <div class="kpi-card glass blue">
+          <div class="kpi-icon">📦</div>
+          <div class="kpi-content">
+            <span class="label">Approvisionnements</span>
+            <h3 class="value">{{ supplies.length }}</h3>
+            <div class="kpi-subtext">Derniers mouvements</div>
+          </div>
+        </div>
+        <div class="kpi-card glass orange">
+          <div class="kpi-icon">🚚</div>
+          <div class="kpi-content">
+            <span class="label">Ravitaillements</span>
+            <h3 class="value">{{ dispenses.length }}</h3>
+            <div class="kpi-subtext">Derniers mouvements</div>
+          </div>
+        </div>
+        <div class="kpi-card glass red">
+          <div class="kpi-icon">⚠️</div>
+          <div class="kpi-content">
+            <span class="label">Alertes Stock</span>
+            <h3 class="value">{{ criticalTanksCount }}</h3>
+            <div class="kpi-subtext">{{ ruptureSoonCount }} ruptures <= 7j</div>
+          </div>
+        </div>
+      </div>
+
+      <template v-if="isStationManager">
+        <h2 class="section-title">📋 Activités station</h2>
+        <div class="charts-grid">
+          <div class="card glass-white">
+            <h3>Approvisionnements récents</h3>
+            <div class="scroll-box-maintenance">
+              <table class="glass-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Station</th>
+                    <th>Cuve</th>
+                    <th>Fournisseur</th>
+                    <th>Volume</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="s in supplies.slice(0, 10)" :key="s.id">
+                    <td>{{ formatDate(s.deliveredAt) }}</td>
+                    <td>{{ s.station?.name || "—" }}</td>
+                    <td>{{ s.tank?.name || s.tank?.fuelType || "—" }}</td>
+                    <td>{{ s.supplier || "—" }}</td>
+                    <td>{{ (s.deliveredL || 0).toLocaleString() }} L</td>
+                  </tr>
+                  <tr v-if="!supplies.length">
+                    <td colspan="5" class="empty">Aucun approvisionnement.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card glass-white">
+            <h3>Ravitaillements récents</h3>
+            <div class="scroll-box-maintenance">
+              <table class="glass-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Station</th>
+                    <th>Véhicule</th>
+                    <th>Cuve</th>
+                    <th>Volume</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="d in dispenses.slice(0, 10)" :key="d.id">
+                    <td>{{ formatDate(d.dispensedAt) }}</td>
+                    <td>{{ d.station?.name || "—" }}</td>
+                    <td>{{ d.vehicle?.plate || "—" }}</td>
+                    <td>{{ d.tank?.name || d.tank?.fuelType || "—" }}</td>
+                    <td>{{ (d.liters || 0).toLocaleString() }} L</td>
+                  </tr>
+                  <tr v-if="!dispenses.length">
+                    <td colspan="5" class="empty">Aucun ravitaillement.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <h2 class="section-title">🚨 Alertes de rupture</h2>
+        <div class="card glass-white">
+          <div class="scroll-box-maintenance">
+            <table class="glass-table">
+              <thead>
+                <tr>
+                  <th>Station</th>
+                  <th>Cuve</th>
+                  <th>Stock</th>
+                  <th>Alerte bas</th>
+                  <th>Rupture estimée</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in stationRuptureAlerts" :key="row.tank.id" :class="row.estimate.daysLeft <= 7 ? 'row-urgent' : 'row-warning'">
+                  <td>{{ row.tank.station?.name || "—" }}</td>
+                  <td>{{ row.tank.name || row.tank.fuelType || "—" }}</td>
+                  <td>{{ (row.tank.currentL || 0).toLocaleString() }} L</td>
+                  <td>{{ (row.tank.lowAlertL || 0).toLocaleString() }} L</td>
+                  <td>Dans {{ row.estimate.daysLeft }}j ({{ formatDate(row.estimate.date) }})</td>
+                </tr>
+                <tr v-if="!stationRuptureAlerts.length">
+                  <td colspan="5" class="empty">Aucune rupture imminente détectée.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+
+      <template v-if="!isStationManager">
       <!-- Charts Grid -->
       <div class="charts-grid mt-20">
         <div class="card glass-white chart-card">
@@ -318,7 +446,7 @@
       <div class="card glass-white fleet-section">
         <div class="fleet-filters">
           <button @click="setFleetFilter('all')" :class="{ active: fleetFilter === 'all' }">
-            Tous ({{ fleetData.length }})
+            Tous ({{ fleetVisibleCount }})
           </button>
           <button @click="setFleetFilter('high')" :class="{ active: fleetFilter === 'high' }">
             Haute conso ({{ highConsumptionCount }})
@@ -326,6 +454,11 @@
           <button @click="setFleetFilter('low')" :class="{ active: fleetFilter === 'low' }">
             Basse conso ({{ lowConsumptionCount }})
           </button>
+        </div>
+
+        <div v-if="repairingVehicles.length > 0" class="repair-alert">
+          ⚠️ {{ repairingVehicles.length }} véhicule(s) en réparation: 
+          {{ repairingVehicles.map(v => v.plate).join(', ') }}
         </div>
 
         <div class="scroll-box-maintenance">
@@ -344,11 +477,12 @@
               <tr v-for="v in filteredFleet" :key="v.id" 
                   @click="selectVehicle(v)" 
                   class="clickable-row">
-                <td><span class="plate-tag">{{ v.plate }}</span></td>
+                <td><span :class="['plate-tag', { repair: isVehicleInRepair(v) }]">{{ v.plate }}</span></td>
                 <td>
                   <div class="vehicle-model-cell">
                     <span class="vehicle-icon-small">🚚</span>
                     <strong>{{ v.model || 'Non spécifié' }}</strong>
+                    <span v-if="isVehicleInRepair(v)" class="repair-badge">EN RÉPARATION</span>
                   </div>
                 </td>
                 <td>{{ (v.totalKm || 0).toLocaleString() }} km</td>
@@ -378,8 +512,10 @@
           </div>
         </div>
       </div>
+      </template>
 
       <!-- Stocks Carburant -->
+      <template v-if="!isFleetManager">
       <h2 class="section-title">📦 Stocks Carburant</h2>
       <div class="stations-grid">
         <div v-for="station in stations" :key="station.id" class="station-card glass-white">
@@ -411,10 +547,11 @@
           </div>
         </div>
       </div>
+      </template>
     </template>
 
     <!-- Modale Véhicule -->
-    <div v-if="selectedVehicle" class="modal-overlay" @click.self="selectedVehicle = null">
+    <div v-if="selectedVehicle && !isStationManager" class="modal-overlay" @click.self="selectedVehicle = null">
       <div class="modal-content glass-white">
         <div class="modal-header">
           <h2>{{ selectedVehicle.plate }} - {{ selectedVehicle.model || 'Véhicule' }}</h2>
@@ -542,13 +679,36 @@ const fleetData = computed(() => dashboardData.value?.fleet || []);
 const maintenances = computed(() => dashboardData.value?.maintenances || []);
 const insurances = computed(() => dashboardData.value?.insurances || []);
 const inspections = computed(() => dashboardData.value?.inspections || []);
+const supplies = computed(() => dashboardData.value?.supplies || []);
+const dispenses = computed(() => dashboardData.value?.dispenses || []);
+const isStationManager = computed(() => authStore.user?.role === "STATION_MANAGER");
+const isFleetManager = computed(() => authStore.user?.role === "FLEET_MANAGER");
 
 // --- Helpers ---
 const normalizeStatus = (status) => String(status || '').trim().toUpperCase();
+const ONLINE_VEHICLE_STATUSES = new Set([
+  'ONLINE',
+  'EN_LIGNE',
+  'EN LIGNE',
+  'ACTIVE',
+  'ACTIF',
+  'EN_SERVICE',
+  'EN SERVICE'
+]);
 
 const isVehicleOnline = (vehicle) => {
   const normalized = normalizeStatus(vehicle?.status);
-  return ['ONLINE', 'EN_LIGNE', 'ACTIVE', 'EN_SERVICE'].includes(normalized);
+  return ONLINE_VEHICLE_STATUSES.has(normalized);
+};
+
+const isVehicleOutOfService = (vehicle) => {
+  const normalized = normalizeStatus(vehicle?.status);
+  return normalized === 'HORS_SERVICE' || normalized === 'HORS SERVICE';
+};
+
+const isVehicleInRepair = (vehicle) => {
+  const normalized = normalizeStatus(vehicle?.status);
+  return normalized === 'EN_REPARATION' || normalized === 'EN REPARATION';
 };
 
 const getDaysDiff = (date) => {
@@ -594,7 +754,7 @@ const today = computed(() => {
 });
 
 const activeVehiclesCount = computed(() => {
-  return fleetData.value.filter(isVehicleOnline).length || 0;
+  return fleetData.value.filter((v) => !isVehicleOutOfService(v) && isVehicleOnline(v)).length || 0;
 });
 
 // --- Maintenance ---
@@ -676,7 +836,12 @@ const latestInspectionsByVehicle = computed(() => {
   for (const inspection of inspections.value) {
     const vehicleId = inspection?.vehicleId || inspection?.vehicle?.id;
     const vehicleKey = vehicleId ? String(vehicleId) : '';
+    const vehicleStatus = normalizeStatus(inspection?.vehicle?.status);
+    const isOnlineVehicle =
+      (vehicleKey && onlineVehicleIds.value.has(vehicleKey)) ||
+      ONLINE_VEHICLE_STATUSES.has(vehicleStatus);
     if (!vehicleKey) continue;
+    if (!isOnlineVehicle) continue;
 
     const current = latestByVehicle.get(vehicleKey);
     if (!current || getInspectionSortTime(inspection) > getInspectionSortTime(current)) {
@@ -773,19 +938,37 @@ const onlineVehicleIds = computed(() => {
   );
 });
 
-const getInsuranceSortTime = (ins) => {
-  const candidates = [ins?.startAt, ins?.createdAt, ins?.updatedAt, ins?.endAt];
-  for (const value of candidates) {
-    const time = value ? new Date(value).getTime() : NaN;
-    if (!Number.isNaN(time)) return time;
-  }
-  return 0;
+const parseDateSafe = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const getInsuranceEndDaysDiff = (endAt) => {
+  const end = parseDateSafe(endAt);
+  if (!end) return null;
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const endDay = new Date(end);
+  endDay.setHours(0, 0, 0, 0);
+
+  return Math.ceil((endDay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const isInsuranceActiveAt = (ins, refDate) => {
+  const start = parseDateSafe(ins?.startAt);
+  const end = parseDateSafe(ins?.endAt);
+  if (!end) return false;
+  const startsBefore = !start || start <= refDate;
+  return startsBefore && end >= refDate;
 };
 
 const latestInsurancesForOnlineVehicles = computed(() => {
   if (!insurances.value || insurances.value.length === 0) return [];
-
-  const latestByVehicle = new Map();
+  const now = new Date();
+  const byVehicle = new Map();
 
   for (const ins of insurances.value) {
     const vehicleId = ins?.vehicleId || ins?.vehicle?.id;
@@ -793,17 +976,50 @@ const latestInsurancesForOnlineVehicles = computed(() => {
     const vehicleStatus = normalizeStatus(ins?.vehicle?.status);
     const isOnlineVehicle =
       (vehicleKey && onlineVehicleIds.value.has(vehicleKey)) ||
-      ['ONLINE', 'EN_LIGNE', 'ACTIVE', 'EN_SERVICE'].includes(vehicleStatus);
+      ONLINE_VEHICLE_STATUSES.has(vehicleStatus);
 
     if (!vehicleKey || !isOnlineVehicle) continue;
+    if (!byVehicle.has(vehicleKey)) byVehicle.set(vehicleKey, []);
+    byVehicle.get(vehicleKey).push(ins);
+  }
 
-    const current = latestByVehicle.get(vehicleKey);
-    if (!current || getInsuranceSortTime(ins) > getInsuranceSortTime(current)) {
-      latestByVehicle.set(vehicleKey, ins);
+  const selected = [];
+
+  for (const vehicleInsurances of byVehicle.values()) {
+    const active = vehicleInsurances
+      .filter((ins) => isInsuranceActiveAt(ins, now))
+      .sort((a, b) => (parseDateSafe(a.endAt)?.getTime() || Number.POSITIVE_INFINITY) - (parseDateSafe(b.endAt)?.getTime() || Number.POSITIVE_INFINITY));
+
+    if (active.length > 0) {
+      selected.push(active[0]);
+      continue;
+    }
+
+    const expired = vehicleInsurances
+      .filter((ins) => {
+        const end = parseDateSafe(ins?.endAt);
+        return end && end < now;
+      })
+      .sort((a, b) => (parseDateSafe(b.endAt)?.getTime() || 0) - (parseDateSafe(a.endAt)?.getTime() || 0));
+
+    if (expired.length > 0) {
+      selected.push(expired[0]);
+      continue;
+    }
+
+    const upcoming = vehicleInsurances
+      .filter((ins) => {
+        const start = parseDateSafe(ins?.startAt);
+        return start && start > now;
+      })
+      .sort((a, b) => (parseDateSafe(a.startAt)?.getTime() || 0) - (parseDateSafe(b.startAt)?.getTime() || 0));
+
+    if (upcoming.length > 0) {
+      selected.push(upcoming[0]);
     }
   }
 
-  return Array.from(latestByVehicle.values());
+  return selected;
 });
 
 const expiringInsurances = computed(() => {
@@ -812,22 +1028,22 @@ const expiringInsurances = computed(() => {
   // Trier par date d'expiration (plus proche en premier)
   return latestInsurancesForOnlineVehicles.value
     .filter(ins => {
-      if (!ins.endAt) return false;
-      const diff = getDaysDiff(ins.endAt);
+      const diff = getInsuranceEndDaysDiff(ins.endAt);
+      if (diff === null) return false;
       // Afficher toutes les assurances qui expirent dans les 60 prochains jours
       return diff <= 60;
     })
     .sort((a, b) => {
-      const diffA = getDaysDiff(a.endAt);
-      const diffB = getDaysDiff(b.endAt);
+      const diffA = getInsuranceEndDaysDiff(a.endAt) ?? 99999;
+      const diffB = getInsuranceEndDaysDiff(b.endAt) ?? 99999;
       return diffA - diffB;
-    })
-    .slice(0, 10); // Limiter à 10 résultats
+    });
 });
 
 // Fonction pour obtenir la classe CSS selon les jours restants
 const getInsuranceDaysClass = (ins) => {
-  const days = getDaysDiff(ins.endAt);
+  const days = getInsuranceEndDaysDiff(ins.endAt);
+  if (days === null) return 'normal';
   
   if (days < 0) return 'expired';
   if (days <= 7) return 'critical';
@@ -845,15 +1061,19 @@ const getInsuranceRowClass = (ins) => {
 
 // --- Flotte ---
 const highConsumptionCount = computed(() => {
-  return fleetData.value.filter(v => parseFloat(v.avgConsumption) > 15).length;
+  return fleetData.value
+    .filter((v) => !isVehicleOutOfService(v))
+    .filter(v => parseFloat(v.avgConsumption) > 15).length;
 });
 
 const lowConsumptionCount = computed(() => {
-  return fleetData.value.filter(v => parseFloat(v.avgConsumption) > 0 && parseFloat(v.avgConsumption) < 10).length;
+  return fleetData.value
+    .filter((v) => !isVehicleOutOfService(v))
+    .filter(v => parseFloat(v.avgConsumption) > 0 && parseFloat(v.avgConsumption) < 10).length;
 });
 
 const filteredFleet = computed(() => {
-  let filtered = fleetData.value;
+  let filtered = fleetData.value.filter((v) => !isVehicleOutOfService(v));
   if (fleetFilter.value === 'high') {
     filtered = filtered.filter(v => parseFloat(v.avgConsumption) > 15);
   }
@@ -862,6 +1082,14 @@ const filteredFleet = computed(() => {
   }
   return filtered.slice(0, 10);
 });
+
+const repairingVehicles = computed(() =>
+  fleetData.value.filter((v) => !isVehicleOutOfService(v) && isVehicleInRepair(v))
+);
+
+const fleetVisibleCount = computed(() =>
+  fleetData.value.filter((v) => !isVehicleOutOfService(v)).length
+);
 
 const getConsumptionClass = (consumption) => {
   const value = parseFloat(consumption || 0);
@@ -889,6 +1117,43 @@ const stations = computed(() => {
 const getStationTanks = (id) => tanks.value.filter(t => t.stationId === id);
 const getTankPercentage = (t) => t.capacityL > 0 ? Math.round((t.currentL / t.capacityL) * 100) : 0;
 const isTankCritical = (t) => t.currentL <= (t.lowAlertL || t.capacityL * 0.1);
+
+const criticalTanksCount = computed(() => tanks.value.filter((t) => isTankCritical(t)).length);
+
+const getTankRuptureEstimate = (tank) => {
+  if (!tank?.id) return null;
+  const now = new Date();
+  const since = new Date(now);
+  since.setDate(since.getDate() - 14);
+
+  const recentDispenses = dispenses.value.filter(
+    (d) => d.tankId === tank.id && d.dispensedAt && new Date(d.dispensedAt) >= since
+  );
+
+  if (!recentDispenses.length) return null;
+  const totalLiters = recentDispenses.reduce((sum, d) => sum + (Number(d.liters) || 0), 0);
+  const avgDaily = totalLiters / 14;
+  if (avgDaily <= 0) return null;
+
+  const daysLeft = Math.max(0, Math.ceil((Number(tank.currentL) || 0) / avgDaily));
+  const ruptureDate = new Date(now);
+  ruptureDate.setDate(ruptureDate.getDate() + daysLeft);
+  return { daysLeft, date: ruptureDate };
+};
+
+const ruptureSoonCount = computed(() =>
+  tanks.value.filter((t) => {
+    const estimate = getTankRuptureEstimate(t);
+    return estimate && estimate.daysLeft <= 7;
+  }).length
+);
+
+const stationRuptureAlerts = computed(() =>
+  tanks.value
+    .map((tank) => ({ tank, estimate: getTankRuptureEstimate(tank) }))
+    .filter((x) => x.estimate && x.estimate.daysLeft <= 14)
+    .sort((a, b) => a.estimate.daysLeft - b.estimate.daysLeft)
+);
 
 const getStockClass = (tank) => {
   const percentage = getTankPercentage(tank);
@@ -1165,10 +1430,49 @@ const refreshData = async () => {
 };
 
 const checkCriticalAlerts = () => {
+  if (isStationManager.value) {
+    const criticalTanks = tanks.value.filter(t => isTankCritical(t));
+    if (criticalTanks.length > 0) {
+      showNotification(`${criticalTanks.length} cuve(s) en stock critique`, 'warning');
+    }
+    if (ruptureSoonCount.value > 0) {
+      showNotification(`${ruptureSoonCount.value} cuve(s) en rupture imminente`, 'warning');
+    }
+    return;
+  }
+
+  if (isFleetManager.value) {
+    if (repairingVehicles.value.length > 0) {
+      showNotification(`${repairingVehicles.value.length} véhicule(s) en réparation`, 'warning');
+    }
+
+    if (urgentMaintenances.value.length > 0) {
+      showNotification(`${urgentMaintenances.value.length} entretien(s) urgent(s)`, 'warning');
+    }
+
+    const urgentInsurances = expiringInsurances.value.filter(ins => {
+      const days = getInsuranceEndDaysDiff(ins.endAt);
+      if (days === null) return false;
+      return days <= 7;
+    });
+    if (urgentInsurances.length > 0) {
+      showNotification(`${urgentInsurances.length} assurance(s) expire(nt) bientôt`, 'warning');
+    }
+
+    if (urgentInspections.value.length > 0) {
+      showNotification(`${urgentInspections.value.length} visite(s) technique(s) urgente(s)`, 'warning');
+    }
+    return;
+  }
+
   // Alertes de stocks critiques
   const criticalTanks = tanks.value.filter(t => isTankCritical(t));
   if (criticalTanks.length > 0) {
     showNotification(`${criticalTanks.length} cuve(s) en stock critique`, 'warning');
+  }
+
+  if (repairingVehicles.value.length > 0) {
+    showNotification(`${repairingVehicles.value.length} véhicule(s) en réparation`, 'warning');
   }
   
   // Alertes d'entretiens urgents
@@ -1178,8 +1482,9 @@ const checkCriticalAlerts = () => {
   
   // Alertes d'assurances expirant bientôt
   const urgentInsurances = expiringInsurances.value.filter(ins => {
-    const days = getDaysDiff(ins.endAt);
-    return days >= 0 && days <= 7;
+    const days = getInsuranceEndDaysDiff(ins.endAt);
+    if (days === null) return false;
+    return days <= 7;
   });
   if (urgentInsurances.length > 0) {
     showNotification(`${urgentInsurances.length} assurance(s) expire(nt) bientôt`, 'warning');
@@ -1808,6 +2113,21 @@ watch(selectedVehicle, (newVal) => {
   letter-spacing: 0.5px;
 }
 
+.plate-tag.repair {
+  background: #f59e0b;
+  color: #1f2937;
+}
+
+.repair-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #b45309;
+  background: #ffedd5;
+  border: 1px solid #fdba74;
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
 /* Conso Badge */
 .conso-badge {
   padding: 4px 8px;
@@ -1881,6 +2201,17 @@ watch(selectedVehicle, (newVal) => {
   background: #3b82f6;
   color: white;
   border-color: #3b82f6;
+}
+
+.repair-alert {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .clickable-row {
@@ -2087,6 +2418,12 @@ watch(selectedVehicle, (newVal) => {
   color: #94a3b8;
   font-style: italic;
   font-size: 13px;
+}
+
+.empty {
+  text-align: center;
+  color: #64748b;
+  font-style: italic;
 }
 
 /* Section Title */

@@ -12,6 +12,7 @@ model User {
   name               String
   email              String              @unique
   password           String
+  avatarUrl          String?
   role               UserRole            @default(VIEWER)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
@@ -21,9 +22,24 @@ model User {
   assignedStation    Station?            @relation("StationManagers", fields: [assignedStationId], references: [id])
   assignedVehicle    Vehicle?            @relation("VehicleManagers", fields: [assignedVehicleId], references: [id])
   vehicleAssignments VehicleAssignment[]
+  loginHistories     LoginHistory[]
 
   @@index([assignedStationId])
   @@index([assignedVehicleId])
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String?
+  ipAddress String?
+  userAgent String?
+  success   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Driver {

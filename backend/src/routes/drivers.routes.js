@@ -21,7 +21,7 @@ router.get("/:id", auth(), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post("/", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req, res, next) => {
+router.post("/", auth(["SUPER_ADMIN","ADMIN"]), async (req, res, next) => {
   try {
     const data = parse(driverSchema, req.body);
     const item = await prisma.driver.create({ data });
@@ -29,7 +29,7 @@ router.post("/", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req, res
   } catch (e) { next(e); }
 });
 
-router.put("/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req, res, next) => {
+router.put("/:id", auth(["SUPER_ADMIN","ADMIN"]), async (req, res, next) => {
   try {
     const data = parse(driverSchema.partial(), req.body);
     const item = await prisma.driver.update({ where: { id: req.params.id }, data });
@@ -37,7 +37,7 @@ router.put("/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req, r
   } catch (e) { next(e); }
 });
 
-router.delete("/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req, res, next) => {
+router.delete("/:id", auth(["SUPER_ADMIN","ADMIN"]), async (req, res, next) => {
   try {
     await prisma.driver.delete({ where: { id: req.params.id } });
     res.status(204).end();

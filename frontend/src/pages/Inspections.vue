@@ -20,7 +20,9 @@
                 <label>Véhicule</label>
                 <select v-model="form.vehicleId" class="custom-input">
                   <option value="" disabled>Choisir véhicule...</option>
-                  <option v-for="v in vehicles" :key="v.id" :value="v.id">{{ v.plate }}</option>
+                  <option v-for="v in selectableVehicles" :key="v.id" :value="v.id" :disabled="isVehicleInRepair(v)">
+                    {{ v.plate }}{{ isVehicleInRepair(v) ? ' (EN RÉPARATION)' : '' }}
+                  </option>
                 </select>
               </div>
               <div class="field flex-2">
@@ -126,7 +128,10 @@
               <!-- Mode historique pour un véhicule spécifique -->
               <template v-if="selectedVehicleForHistory">
                 <tr v-for="it in vehicleHistory" :key="it.id">
-                  <td><strong>{{ plate(it.vehicleId) }}</strong></td>
+                  <td>
+                    <strong>{{ plate(it.vehicleId) }}</strong>
+                    <span v-if="isVehicleInRepairById(it.vehicleId)" class="vehicle-repair-note">EN RÉPARATION</span>
+                  </td>
                   <td>
                     <span class="type-tag">{{ it.center || 'N/A' }}</span><br/>
                     <small>{{ it.notes }}</small>
@@ -173,6 +178,7 @@
                   <td>
                     <div style="display: flex; align-items: center; gap: 8px;">
                       <strong>{{ plate(it.vehicleId) }}</strong>
+                      <span v-if="isVehicleInRepairById(it.vehicleId)" class="vehicle-repair-note">EN RÉPARATION</span>
                       <button @click="viewVehicleHistory(it.vehicleId)" class="btn-history" title="Voir l'historique">
                         📋
                       </button>
@@ -256,7 +262,25 @@ const initialForm = { vehicleId: "", center: "", cost: 0, notes: "", type: "VISI
 const form = ref({ ...initialForm });
 const resultForm = ref({ id: null, vehicleId: "", result: "SUCCES", cost: null, notes: "" });
 
+const normalizeVehicleStatus = (status) => String(status || "").trim().toUpperCase();
+const isVehicleOutOfService = (vehicle) => {
+  const s = normalizeVehicleStatus(vehicle?.status);
+  return s === "HORS_SERVICE" || s === "HORS SERVICE";
+};
+const isVehicleInRepair = (vehicle) => {
+  const s = normalizeVehicleStatus(vehicle?.status);
+  return s === "EN_REPARATION" || s === "EN REPARATION";
+};
+const isVehicleInService = (vehicle) => {
+  const s = normalizeVehicleStatus(vehicle?.status);
+  return s === "EN_SERVICE" || s === "EN SERVICE" || s === "ACTIF" || s === "ACTIVE";
+};
+const selectableVehicles = computed(() => vehicles.value.filter((v) => !isVehicleOutOfService(v)));
+
 const plate = (id) => vehicles.value.find(v => v.id === id)?.plate || "—";
+const getVehicleById = (id) => vehicles.value.find(v => String(v.id) === String(id));
+const isVehicleInRepairById = (id) => isVehicleInRepair(getVehicleById(id));
+const isVehicleOutOfServiceById = (id) => isVehicleOutOfService(getVehicleById(id));
 
 const getEffectiveNextVisitDate = (visit) => {
   if (!visit) return null;
@@ -278,6 +302,7 @@ const latestVisits = computed(() => {
   
   items.value.forEach(visit => {
     const vehicleId = visit.vehicleId;
+    if (isVehicleOutOfServiceById(vehicleId)) return;
     
     // Si pas encore de visite pour ce véhicule OU si c'est plus récent
     if (!visitsByVehicle[vehicleId]) {
@@ -424,6 +449,42 @@ const getTimeRemainingClass = (scheduledAt) => {
   return 'time-future';
 };
 
+const getOngoingVisitUntil = (visit) => {
+  if (!visit) return null;
+  const now = new Date();
+
+  if (visit.nextInspect) {
+    const next = new Date(visit.nextInspect);
+    if (!Number.isNaN(next.getTime()) && next > now) return next;
+  }
+
+  if (!visit.result && visit.scheduledAt) {
+    const scheduled = new Date(visit.scheduledAt);
+    if (!Number.isNaN(scheduled.getTime()) && scheduled > now) return scheduled;
+  }
+
+  return null;
+};
+
+const getDaysUntilDate = (date) => {
+  if (!date) return null;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const findBlockingVisitForNewEntry = (vehicleId) => {
+  if (!vehicleId) return null;
+  return items.value.find((visit) => {
+    if (String(visit.vehicleId) !== String(vehicleId)) return false;
+    const ongoingUntil = getOngoingVisitUntil(visit);
+    const remaining = getDaysUntilDate(ongoingUntil);
+    return remaining !== null && remaining > 30;
+  }) || null;
+};
+
 async function load() {
   try {
     const [v, i] = await Promise.all([
@@ -459,6 +520,20 @@ async function processSubmit() {
     error.value = "Veuillez sélectionner un véhicule et une date";
     return;
   }
+  const selectedVehicle = getVehicleById(form.value.vehicleId);
+  if (!isVehicleInService(selectedVehicle)) {
+    error.value = "Impossible: seules les opérations sur véhicule EN SERVICE sont autorisées.";
+    return;
+  }
+  if (!isEditing.value) {
+    const blockingVisit = findBlockingVisitForNewEntry(form.value.vehicleId);
+    if (blockingVisit) {
+      const until = getOngoingVisitUntil(blockingVisit);
+      const remaining = getDaysUntilDate(until);
+      error.value = `Impossible de saisir une nouvelle visite: une visite en cours reste valide ${remaining} jour(s).`;
+      return;
+    }
+  }
   
   submitting.value = true;
   try {
@@ -487,6 +562,10 @@ async function processSubmit() {
 }
 
 function openResult(it) {
+  if (!isVehicleInService(getVehicleById(it.vehicleId))) {
+    error.value = "Impossible: véhicule non EN SERVICE.";
+    return;
+  }
   console.log("📋 Ouverture du formulaire pour:", it);
   
   resultForm.value = { 
@@ -573,6 +652,10 @@ async function submitResult() {
 }
 
 function editItem(it) {
+  if (!isVehicleInService(getVehicleById(it.vehicleId))) {
+    error.value = "Impossible: véhicule non EN SERVICE.";
+    return;
+  }
   if (!canModify(it)) {
     error.value = it?.result === "SUCCES"
       ? "Cette visite validée (SUCCÈS) est verrouillée après 24h."
@@ -676,6 +759,17 @@ onMounted(load);
 .btn-lock { opacity: 0.3; cursor: not-allowed; }
 .btn-complete { background: #d1fae5 !important; color: #065f46; }
 .btn-complete:hover:not(:disabled) { background: #10b981 !important; color: white !important; }
+.vehicle-repair-note {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #b45309;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 2px 6px;
+}
 .notification { padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; font-weight: 500; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
 .notification button { background: transparent; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
 .bg-red { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); }
