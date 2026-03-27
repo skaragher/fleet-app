@@ -15,14 +15,20 @@
     },
     "android": {
       "package": "com.fleetenergy.driver",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#1d4ed8",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
-      "versionCode": 2
+      "versionCode": 3
     },
     "ios": {
-      "bundleIdentifier": "com.fleetenergy.driver"
+      "bundleIdentifier": "com.fleetenergy.driver",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "icon": "./assets/icon.png",
     "splash": {
