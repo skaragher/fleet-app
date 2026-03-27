@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "FLEETENERGY Driver",
+    "slug": "fleetenergy-driver",
+    "scheme": "fleetenergydriver",
+    "version": "1.0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "jsEngine": "hermes",
+    "extra": {
+      "apiUrl": "http://193.168.173.181/api",
+      "eas": {
+        "projectId": "c0de82e2-6486-4898-84a1-c2a7d36b760e"
+      }
+    },
+    "android": {
+      "package": "com.fleetenergy.driver",
+      "adaptiveIcon": {
+        "backgroundColor": "#1d4ed8",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "versionCode": 2
+    },
+    "ios": {
+      "bundleIdentifier": "com.fleetenergy.driver"
+    },
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#dde3f7",
+      "resizeMode": "contain",
+      "image": "./assets/splash-icon.png"
+    },
+    "owner": "skaragher"
+  }
+}

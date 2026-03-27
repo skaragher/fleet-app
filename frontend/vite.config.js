@@ -11,7 +11,18 @@ export default defineConfig({
     port: 5173, // Changez à 5173 pour éviter les problèmes CORS
     host: true,
     open: true,
-    cors: true
+    cors: true,
+    // Permet au frontend (Vite) d'appeler le backend via `/api/*` sans changer le code.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      }
+    }
   },
   
   // Résolution des alias

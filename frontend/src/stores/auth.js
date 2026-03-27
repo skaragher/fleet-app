@@ -1,8 +1,9 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import axios from "axios";
+import api from "../services/api";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const authApi = axios.create({
   baseURL: API_URL,
@@ -28,17 +29,25 @@ export const useAuthStore = defineStore("auth", () => {
   const lastCheck = ref(null);
 
   if (token.value) {
-    axios.defaults.headers.common["Authorization"] = `Bearer ${token.value}`;
+    const headerValue = `Bearer ${token.value}`;
+    authApi.defaults.headers.common["Authorization"] = headerValue;
+    api.defaults.headers.common["Authorization"] = headerValue;
   }
 
   const isAuthenticated = computed(() => !!token.value && !!user.value);
   const userRole = computed(() => user.value?.role || null);
-  const isSuperAdmin = computed(() => userRole.value === "SUPER_ADMIN");
-  const isFleetManager = computed(() => userRole.value === "FLEET_MANAGER");
-  const isStationManager = computed(() => userRole.value === "STATION_MANAGER");
-  const isVehicleManager = computed(() => userRole.value === "VEHICLE_MANAGER");
-  const isDriver = computed(() => userRole.value === "DRIVER");
-  const isViewer = computed(() => userRole.value === "VIEWER");
+  const allRoles = computed(() => {
+    const primary = user.value?.role;
+    const extras = Array.isArray(user.value?.roles) ? user.value.roles : [];
+    return Array.from(new Set([primary, ...extras].filter(Boolean)));
+  });
+  const hasRole = (role) => allRoles.value.includes(role);
+  const isSuperAdmin = computed(() => hasRole("SUPER_ADMIN"));
+  const isFleetManager = computed(() => hasRole("FLEET_MANAGER"));
+  const isStationManager = computed(() => hasRole("STATION_MANAGER"));
+  const isVehicleManager = computed(() => hasRole("VEHICLE_MANAGER"));
+  const isDriver = computed(() => hasRole("DRIVER"));
+  const isViewer = computed(() => hasRole("VIEWER"));
 
   const clearError = () => {
     error.value = null;
@@ -54,7 +63,9 @@ export const useAuthStore = defineStore("auth", () => {
 
     localStorage.setItem("token", newToken);
     localStorage.setItem("user", JSON.stringify(newUser));
-    axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
+    const headerValue = `Bearer ${newToken}`;
+    authApi.defaults.headers.common["Authorization"] = headerValue;
+    api.defaults.headers.common["Authorization"] = headerValue;
   };
 
   const setSession = async (newToken, newUser) => {
@@ -70,7 +81,8 @@ export const useAuthStore = defineStore("auth", () => {
 
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    delete axios.defaults.headers.common["Authorization"];
+    delete authApi.defaults.headers.common["Authorization"];
+    delete api.defaults.headers.common["Authorization"];
   };
 
   const clearStorage = () => {
@@ -237,6 +249,7 @@ export const useAuthStore = defineStore("auth", () => {
     lastCheck,
     isAuthenticated,
     userRole,
+    allRoles,
     isSuperAdmin,
     isFleetManager,
     isStationManager,

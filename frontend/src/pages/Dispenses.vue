@@ -95,7 +95,7 @@
               <div class="field">
                 <label>Km Compteur <small v-if="selectedVehicle" class="info-km">
                   (Actuel: {{ selectedVehicle.odometerKm }} km)
-                </small></label>
+                </small><small v-if="form.isPrivateVehicle" class="info-km">(optionnel)</small></label>
                 <input type="number" v-model.number="form.odometerKm" class="custom-input" />
               </div>
               <div class="field">
@@ -216,7 +216,7 @@
               <tr v-for="it in paginatedItems" :key="it.id">
                 <td>{{ formatDate(it.dispensedAt) }}</td>
                 <td>
-                  <strong>{{ it.vehicle?.plate || 'N/A' }}</strong><br/>
+                  <strong>{{ getDispenseVehicleLabel(it) }}</strong><br/>
                   <small>{{ it.driver?.fullName || 'N/A' }}</small>
                 </td>
                 <td>
@@ -229,7 +229,7 @@
                 </td>
                 <td class="text-center">
                   <div v-if="canModify(it.dispensedAt)" class="action-buttons">
-                    <button @click="editItem(it)" class="btn-icon" title="Modifier">✏️</button>
+                    <button v-if="!isPrivateDispense(it)" @click="editItem(it)" class="btn-icon" title="Modifier">✏️</button>
                     <button @click="confirmDeleteItem(it)" class="btn-icon btn-del" title="Supprimer">🗑️</button>
                   </div>
                   <span v-else class="locked" title="Délai dépassé">🔒</span>
@@ -321,7 +321,7 @@
           <div class="modal-details" v-if="itemToDelete">
             <div class="detail-item">
               <span class="detail-label">Véhicule :</span>
-              <span class="detail-value">{{ itemToDelete.vehicle?.plate || 'N/A' }}</span>
+              <span class="detail-value">{{ getDispenseVehicleLabel(itemToDelete) }}</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">Date :</span>
@@ -596,6 +596,14 @@ const getVehiclePlate = (vehicleId) => {
   return vehicle ? vehicle.plate : vehicleId;
 };
 
+const isPrivateDispense = (item) => !item?.vehicleId && !!item?.privatePlate;
+
+const getDispenseVehicleLabel = (item) => {
+  if (item?.vehicle?.plate) return item.vehicle.plate;
+  if (item?.privatePlate) return `${item.privatePlate} (Privé)`;
+  return "N/A";
+};
+
 const getStationName = (stationId) => {
   const station = stations.value.find(s => s.id === stationId);
   return station ? station.name : stationId;
@@ -786,6 +794,10 @@ async function processSubmit() {
   if (!form.value.liters || form.value.liters <= 0) {
     validationErrors.value.push("Volume doit être supérieur à 0");
   }
+
+  if (!form.value.isPrivateVehicle && (form.value.odometerKm === null || form.value.odometerKm === undefined || form.value.odometerKm === "")) {
+    validationErrors.value.push("Kilométrage requis pour un véhicule de l'entreprise");
+  }
   
   if (!form.value.isPrivateVehicle && selectedVehicle.value && form.value.odometerKm < selectedVehicle.value.odometerKm) {
     validationErrors.value.push(`L'index saisi (${form.value.odometerKm}) est inférieur au dernier index (${selectedVehicle.value.odometerKm}) du véhicule`);
@@ -808,7 +820,9 @@ async function processSubmit() {
       stationId: tank?.stationId ? String(tank.stationId) : null,
       liters: Number(form.value.liters),
       unitPrice: form.value.unitPrice ? Number(form.value.unitPrice) : null,
-      odometerKm: form.value.odometerKm ? Number(form.value.odometerKm) : null
+      odometerKm: form.value.odometerKm === "" || form.value.odometerKm === null || form.value.odometerKm === undefined
+        ? null
+        : Number(form.value.odometerKm)
     };
 
     if (form.value.isPrivateVehicle) {
@@ -830,7 +844,7 @@ async function processSubmit() {
       // Message de succès pour l'édition
       showSuccessPopup(
         "Ravitaillement modifié avec succès !",
-        { label: "Véhicule", value: selectedVehicle.value?.plate || 'N/A' },
+        { label: "Véhicule", value: form.value.isPrivateVehicle ? `${form.value.privatePlate || "N/A"} (Privé)` : selectedVehicle.value?.plate || 'N/A' },
         [
           { label: "Volume", value: `${form.value.liters} L` },
           { label: "Montant", value: `${montantTotal} FCFA` },
@@ -848,7 +862,7 @@ async function processSubmit() {
       // Message de succès pour la création
       showSuccessPopup(
         "Ravitaillement enregistré avec succès !",
-        { label: "Véhicule", value: selectedVehicle.value?.plate || 'N/A' },
+        { label: "Véhicule", value: form.value.isPrivateVehicle ? `${form.value.privatePlate || "N/A"} (Privé)` : selectedVehicle.value?.plate || 'N/A' },
         [
           { label: "Volume", value: `${form.value.liters} L` },
           { label: "Montant", value: `${montantTotal} FCFA` },
@@ -908,7 +922,7 @@ async function executeDelete() {
     // Message de succès pour la suppression
     showSuccessPopup(
       "Ravitaillement supprimé avec succès !",
-      { label: "Véhicule", value: itemToDelete.value.vehicle?.plate || 'N/A' },
+      { label: "Véhicule", value: getDispenseVehicleLabel(itemToDelete.value) },
       [
         { label: "Volume", value: `${itemToDelete.value.liters} L` },
         { label: "Montant", value: `${((itemToDelete.value.liters || 0) * (itemToDelete.value.unitPrice || 0)).toLocaleString()} FCFA` },
@@ -954,7 +968,12 @@ const editItem = (it) => {
     tankId: it.tankId || "",
     liters: it.liters || 0,
     unitPrice: it.unitPrice || 0,
-    odometerKm: it.odometerKm || 0
+    odometerKm: it.odometerKm || 0,
+    isPrivateVehicle: !it.vehicleId && !!it.privatePlate,
+    privatePlate: it.privatePlate || "",
+    privateMake: it.privateMake || "",
+    privateModel: it.privateModel || "",
+    privateFuelType: it.privateFuelType || ""
   }; 
   window.scrollTo(0,0); 
   clearMessages();

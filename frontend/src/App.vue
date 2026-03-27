@@ -1,5 +1,5 @@
 <template>
-  <div class="layout" :class="{ 'sidebar-open': isMenuOpen }">
+  <div class="layout" :class="{ 'sidebar-open': isMenuOpen, 'sidebar-collapsed': auth.token && !isMenuOpen }">
     <!-- Overlay : voile sombre pour fermer le menu sur mobile -->
     <div v-if="isMenuOpen" class="sidebar-overlay" @click="closeMenu"></div>
 
@@ -14,60 +14,26 @@
         </button>
         <div class="brand">
           <div class="logo">
-            <span class="logo-icon">⛽</span>
+            <img src="/favicon.png" alt="FLEETENERGY" class="brand-icon-image" />
           </div>
           <div class="brand-text">
             <h1 class="brand-title">FLEETENERGY</h1>
-            <p class="brand-subtitle">MANAGER</p>
           </div>
         </div>
       </div>
 
       <div class="topbar-actions">
-        <div v-if="auth.user" class="user-profile">
-          <div class="user-info">
-            <div class="user-details">
-              <p class="user-name">{{ auth.user.name }}</p>
-              <div class="user-meta">
-                <span class="user-role" :class="getRoleClass(auth.user.role)">
-                  {{ formatRoleLabel(auth.user.role) }}
-                </span>
-                <!-- Affichage des ressources assignées -->
-                <div v-if="assignedVehicle || assignedStation" class="user-assignments">
-                  <span v-if="assignedVehicle" class="assignment-badge">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-2.7-.6-4.5-1.9C10.7 7.3 10 6.1 10 5V3c0-.6-.4-1-1-1H8"/>
-                      <path d="M3 17h2c.6 0 1-.4 1-1v-3c0-.9.7-1.7 1.5-1.9C7.3 10.6 10 10 10 10s2.7-.6 4.5-1.9C15.3 7.3 16 6.1 16 5V3c0-.6.4-1 1-1h2"/>
-                    </svg>
-                    {{ assignedVehicle.plate }}
-                  </span>
-                  <span v-if="assignedStation" class="assignment-badge">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M8 2v4M16 2v4"/>
-                      <rect x="3" y="4" width="18" height="18" rx="2"/>
-                      <path d="M8 10h8M8 14h8M8 18h8"/>
-                    </svg>
-                    {{ assignedStation.name }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div class="user-avatar" :class="getRoleClass(auth.user.role)">
-              <img
-                v-if="!topbarAvatarLoadError && userAvatarUrl"
-                :src="userAvatarUrl"
-                alt="Avatar"
-                class="user-avatar-image"
-                @error="topbarAvatarLoadError = true"
-              />
-              <span v-else>{{ getUserInitials(auth.user.name) }}</span>
-            </div>
-          </div>
-          <button class="btn-logout" @click="logout" title="Déconnexion">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
-            </svg>
-          </button>
+        <div v-if="auth.token" class="topbar-company-right">
+          <strong>{{ companyTopbar.line1 }}</strong>
+          <span v-if="companyTopbar.line2">{{ companyTopbar.line2 }}</span>
+        </div>
+        <div v-if="companyLogoUrl" class="topbar-company-logo" title="Logo entreprise">
+          <img
+            :src="companyLogoUrl"
+            alt="Logo entreprise"
+            class="company-logo-image"
+            @error="companyLogoLoadError = true"
+          />
         </div>
       </div>
     </header>
@@ -75,9 +41,31 @@
     <div class="body">
       <aside v-if="auth.token" class="sidebar">
         <div class="sidebar-header">
-          <h3 class="sidebar-title">Navigation</h3>
+          <h3 class="sidebar-title">Menu</h3>
           <div class="user-role-badge" :class="getRoleClass(auth.user?.role)">
             {{ formatRoleLabel(auth.user?.role) }}
+          </div>
+          <div v-if="auth.user" class="sidebar-user-card">
+            <div class="sidebar-user-main">
+              <div class="user-avatar" :class="getRoleClass(auth.user.role)">
+                <img
+                  v-if="!topbarAvatarLoadError && userAvatarUrl"
+                  :src="userAvatarUrl"
+                  alt="Avatar"
+                  class="user-avatar-image"
+                  @error="topbarAvatarLoadError = true"
+                />
+                <span v-else>{{ getUserInitials(auth.user.name) }}</span>
+              </div>
+              <div class="sidebar-user-text">
+                <p class="sidebar-user-name">{{ auth.user.name }}</p>
+              </div>
+              <button class="btn-logout sidebar-logout" @click="logout" title="Déconnexion">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
         
@@ -319,6 +307,22 @@
               </div>
               <span class="nav-label">Mon Profil</span>
             </RouterLink>
+
+            <RouterLink
+              v-if="canManageCompanySettings"
+              to="/settings"
+              class="nav-item"
+              @click="closeMenu"
+              :class="{ 'active': $route.path.includes('/settings') }"
+            >
+              <div class="nav-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+              </div>
+              <span class="nav-label">Paramètres</span>
+            </RouterLink>
             
             <RouterLink 
               v-if="isVehicleManager || isDriver" 
@@ -381,26 +385,38 @@
         <div class="page-container">
           <RouterView />
         </div>
+        <footer class="app-footer" v-if="auth.token">
+          <span>{{ companyFooter.left }}</span>
+          <span v-if="companyFooter.right">{{ companyFooter.right }}</span>
+          <span class="powered-by">Powered by YEFA TECHNOLOGIE</span>
+        </footer>
       </main>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { RouterLink, RouterView, useRoute } from "vue-router";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "./stores/auth";
+import { useCompanyStore } from "./stores/company";
 import api from "./services/api";
 
 const auth = useAuthStore();
+const company = useCompanyStore();
 const route = useRoute();
+const router = useRouter();
 const isMenuOpen = ref(false);
 const assignedVehicle = ref(null);
 const assignedStation = ref(null);
 const topbarAvatarLoadError = ref(false);
+const companyLogoLoadError = ref(false);
+const inactivityTimer = ref(null);
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll", "touchstart"];
 
 const getApiBaseUrl = () =>
-  (import.meta.env.VITE_API_URL || "http://localhost:3000/api").replace(/\/api\/?$/, "");
+  (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "");
 
 const buildInitialAvatarDataUrl = (name) => {
   const initials = (name || "U")
@@ -426,7 +442,20 @@ const resolveAvatarUrl = (user) => {
   return `${getApiBaseUrl()}${src}`;
 };
 
+const resolveCompanyLogoUrl = (logoUrl) => {
+  if (!logoUrl) return "";
+  if (String(logoUrl).startsWith("http") || String(logoUrl).startsWith("data:")) return logoUrl;
+  if (String(logoUrl).startsWith("/")) return `${getApiBaseUrl()}${logoUrl}`;
+  return `${getApiBaseUrl()}/${String(logoUrl).replace(/^\/+/, "")}`;
+};
+
 const userAvatarUrl = computed(() => resolveAvatarUrl(auth.user));
+const companyTopbar = computed(() => company.displayTopbar);
+const companyFooter = computed(() => company.displayFooter);
+const companyLogoUrl = computed(() => {
+  if (companyLogoLoadError.value) return "";
+  return resolveCompanyLogoUrl(company.settings.logoUrl);
+});
 
 // Watch route changes to close menu on mobile
 watch(() => route.path, () => {
@@ -440,6 +469,78 @@ watch(
   () => {
     topbarAvatarLoadError.value = false;
   }
+);
+
+watch(
+  () => company.settings.logoUrl,
+  () => {
+    companyLogoLoadError.value = false;
+  }
+);
+
+watch(
+  () => auth.token,
+  async (token) => {
+    if (token) {
+      await company.loadFromServer();
+    }
+  },
+  { immediate: true }
+);
+
+const clearInactivityTimer = () => {
+  if (inactivityTimer.value) {
+    clearTimeout(inactivityTimer.value);
+    inactivityTimer.value = null;
+  }
+};
+
+const handleInactivityTimeout = async () => {
+  if (!auth.token) return;
+  const currentPath = route.fullPath || "/";
+  const safeRedirect = currentPath.startsWith("/") ? currentPath : "/";
+  sessionStorage.setItem("post_login_redirect", safeRedirect);
+  auth.clearAuth();
+  await router.push({
+    name: "Login",
+    query: { reason: "inactive", redirect: safeRedirect },
+  });
+};
+
+const resetInactivityTimer = () => {
+  if (!auth.token) return;
+  clearInactivityTimer();
+  inactivityTimer.value = setTimeout(handleInactivityTimeout, INACTIVITY_TIMEOUT_MS);
+};
+
+const handleUserActivity = () => {
+  resetInactivityTimer();
+};
+
+const attachActivityListeners = () => {
+  ACTIVITY_EVENTS.forEach((eventName) => {
+    window.addEventListener(eventName, handleUserActivity, { passive: true });
+  });
+};
+
+const detachActivityListeners = () => {
+  ACTIVITY_EVENTS.forEach((eventName) => {
+    window.removeEventListener(eventName, handleUserActivity);
+  });
+};
+
+watch(
+  () => auth.token,
+  (token) => {
+    if (token) {
+      attachActivityListeners();
+      resetInactivityTimer();
+    } else {
+      clearInactivityTimer();
+      detachActivityListeners();
+    }
+  },
+  { immediate: true }
 );
 
 // === COMPUTED PROPERTIES POUR LES RÔLES ===
@@ -492,11 +593,16 @@ const canEditMaintenance = computed(() => {
 });
 
 const canManageUsers = computed(() => {
-  return isSuperAdmin.value || hasPermission('manage_users');
+  return isSuperAdmin.value || isFleetManager.value || hasPermission('manage_users');
+});
+
+const canManageCompanySettings = computed(() => {
+  return isSuperAdmin.value;
 });
 
 const canViewReports = computed(() => {
   return isSuperAdmin.value || isFleetManager.value || 
+         isDriver.value ||
          hasPermission('view_reports');
 });
 
@@ -545,6 +651,10 @@ function logout() {
 
 // === CHARGEMENT DES DONNÉES ASSIGNÉES ===
 onMounted(async () => {
+  if (window.innerWidth < 1024) {
+    isMenuOpen.value = false;
+  }
+
   if (auth.user?.assignedVehicleId) {
     try {
       const response = await api.get(`/vehicles/${auth.user.assignedVehicleId}`);
@@ -562,6 +672,11 @@ onMounted(async () => {
       console.error('Erreur chargement station assignée:', error);
     }
   }
+});
+
+onBeforeUnmount(() => {
+  clearInactivityTimer();
+  detachActivityListeners();
 });
 </script>
 
@@ -630,6 +745,25 @@ onMounted(async () => {
   box-shadow: 0 8px 24px -16px rgb(37 99 235 / 0.5);
 }
 
+.topbar-company-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+  color: #1e293b;
+  text-align: right;
+}
+
+.topbar-company-right strong {
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.topbar-company-right span {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
 .brand-section {
   display: flex;
   align-items: center;
@@ -637,7 +771,7 @@ onMounted(async () => {
 }
 
 .menu-toggle {
-  display: none;
+  display: block;
   background: none;
   border: none;
   cursor: pointer;
@@ -656,18 +790,28 @@ onMounted(async () => {
   gap: 0.75rem;
 }
 
+
+
 .logo {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #2563eb, #1e40af);
+  width: 56px;
+  height: 56px;
+  background: #ffffff;
+  border: 1px solid #c7d2fe;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 1.5rem;
   box-shadow: var(--shadow-md);
 }
+.brand-icon-image {
+  width: 40px;
+  height: 40px;
+  display: block;
+  object-fit: contain;
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
 
 .brand-text {
   display: flex;
@@ -692,6 +836,24 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+
+.topbar-company-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #dbeafe;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.company-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .user-profile {
@@ -829,6 +991,10 @@ onMounted(async () => {
   box-shadow: 10px 0 30px -20px rgb(15 23 42 / 0.9);
 }
 
+.layout.sidebar-collapsed .sidebar {
+  transform: translateX(-100%);
+}
+
 @media (max-width: 1023px) {
   .sidebar {
     transform: translateX(-100%);
@@ -862,6 +1028,39 @@ onMounted(async () => {
   color: #e0e7ff;
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-user-card {
+  margin-top: 0.9rem;
+  padding: 0.55rem;
+  border: 1px solid rgba(147, 197, 253, 0.25);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.sidebar-user-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sidebar-user-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-user-name {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 0.83rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-logout {
+  color: #cbd5e1;
 }
 
 /* Navigation */
@@ -995,6 +1194,10 @@ onMounted(async () => {
   padding: 1.5rem;
 }
 
+.layout.sidebar-collapsed .content {
+  margin-left: 0;
+}
+
 @media (max-width: 1023px) {
   .content {
     margin-left: 0;
@@ -1005,6 +1208,24 @@ onMounted(async () => {
   max-width: 1400px;
   margin: 0 auto;
   animation: fadeIn 0.3s ease;
+}
+
+.app-footer {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-top: 1px solid #dbeafe;
+  color: #64748b;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.powered-by {
+  margin-left: auto;
+  font-weight: 600;
+  color: #475569;
 }
 
 @keyframes fadeIn {
@@ -1022,6 +1243,10 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .topbar {
     padding: 0.75rem 1rem;
+  }
+
+  .topbar-company-right {
+    display: none;
   }
   
   .menu-toggle {
@@ -1062,3 +1287,5 @@ onMounted(async () => {
   background: linear-gradient(135deg, #60a5fa, #2563eb);
 }
 </style>
+
+

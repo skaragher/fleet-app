@@ -22,13 +22,17 @@ import insurersRoutes from "./routes/insurers.routes.js";
 import fuelDispensesRoutes from './routes/fuel.dispenses.routes.js';  
 import fuelSuppliesRoutes from './routes/fuel.supplies.routes.js'; 
 import usersRoutes from "./routes/users.routes.js";
+import companySettingsRoutes from "./routes/company-settings.routes.js";
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+app.set("trust proxy", 1);
 
 // Configuration CORS dynamique
 const allowedOrigins = [
+  'https://193.168.173.181',
+  'http://193.168.173.181',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
@@ -37,6 +41,8 @@ const allowedOrigins = [
   'http://127.0.0.1:5174',
   'http://127.0.0.1:5175'
 ];
+const normalizedAllowedOrigins = allowedOrigins
+  .map((o) => String(o).trim().toLowerCase().replace(/\/$/, ""));
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -51,7 +57,8 @@ const corsOptions = {
     }
     
     // Vérifier si l'origine est autorisée
-    if (allowedOrigins.includes(origin)) {
+    const normalizedOrigin = String(origin).trim().toLowerCase().replace(/\/$/, "");
+    if (normalizedAllowedOrigins.includes(normalizedOrigin)) {
       callback(null, origin);
     } else {
       console.warn(`⚠️ CORS bloqué pour l'origine: ${origin}`);
@@ -141,18 +148,22 @@ app.get("/health", (_req, res) => {
 
 // Routes API
 app.use("/api/auth", authRoutes);
+// Compat: anciens clients sans préfixe `/api`
+app.use("/auth", authRoutes);
 app.use("/api/vehicles", vehiclesRoutes);
 app.use("/api/drivers", driversRoutes);
 app.use("/api/stations", stationsRoutes);
+// Monter les routes spécialisées avant /api/fuel pour éviter qu'elles soient masquées
+app.use('/api/fuel/dispenses', fuelDispensesRoutes);
+app.use('/api/fuel/supplies', fuelSuppliesRoutes);
 app.use("/api/fuel", fuelRoutes);
 app.use("/api/maintenance", maintenanceRoutes);
 app.use("/api/insurance", insuranceRoutes);
 app.use("/api/inspections", inspectionsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/insurers", insurersRoutes);
-app.use('/api/fuel/dispenses', fuelDispensesRoutes);
-app.use('/api/fuel/supplies', fuelSuppliesRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/company-settings", companySettingsRoutes);
 
 // Middleware pour les routes non trouvées
 app.use((req, res, next) => {
@@ -168,7 +179,7 @@ app.use((err, req, res, next) => {
   console.error('❌ Erreur serveur:', err.stack);
   
   // Erreur CORS
-  if (err.message.includes('CORS')) {
+  if (String(err?.message || "").includes('CORS')) {
     return res.status(403).json({
       error: "Erreur CORS",
       message: err.message,

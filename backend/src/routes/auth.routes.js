@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,7 +10,7 @@ import { auth } from '../middleware/auth.js';
 import { extractAssignedStationIds } from '../utils/userScope.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'votre-secret-jwt-super-securise';
+const getJwtSecret = () => process.env.JWT_SECRET || 'votre-secret-jwt-super-securise';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const AVATARS_DIR = path.resolve(__dirname, '../../uploads/avatars');
@@ -25,8 +26,12 @@ const USER_INCLUDE = {
 const sanitizeUser = (user, avatarUrlOverride = null) => {
   if (!user) return null;
   const { password, ...rest } = user;
+  const extraRoles = Array.isArray(rest.roles) ? rest.roles : [];
+  const allRoles = Array.from(new Set([rest.role, ...extraRoles].filter(Boolean)));
   return {
     ...rest,
+    roles: extraRoles,
+    allRoles,
     avatarUrl: avatarUrlOverride || rest.avatarUrl || null,
     assignedStationIds: extractAssignedStationIds(rest),
   };
@@ -34,16 +39,19 @@ const sanitizeUser = (user, avatarUrlOverride = null) => {
 
 const buildToken = (user) => {
   const assignedStationIds = extractAssignedStationIds(user);
+  const roles = Array.isArray(user?.roles) ? user.roles : [];
   return jwt.sign(
     {
       userId: user.id,
       email: user.email,
       role: user.role,
+      roles,
+      isActive: user.isActive !== false,
       assignedVehicleId: user.assignedVehicleId || null,
       assignedStationId: user.assignedStationId || null,
       assignedStationIds,
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '24h' }
   );
 };
@@ -126,46 +134,140 @@ const recordLoginAttempt = async ({ userId = null, email = null, ipAddress = nul
   }
 };
 
-// Middleware CORS pour les tests
-router.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+const clampMinutes = (value, fallback = 30) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(Math.floor(n), 1), 1440);
+};
 
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+const PASSWORD_RESET_SECRET = process.env.PASSWORD_RESET_TOKEN_SECRET || getJwtSecret();
+const PASSWORD_RESET_EXPIRES_MINUTES = clampMinutes(process.env.PASSWORD_RESET_EXPIRES_MINUTES, 30);
+const PASSWORD_RESET_DEBUG = String(process.env.PASSWORD_RESET_DEBUG || '').toLowerCase() === 'true';
+
+const parseBool = (value, fallback = false) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  const v = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(v)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(v)) return false;
+  return fallback;
+};
+
+const hashResetToken = (token) => {
+  const value = String(token || '');
+  return crypto.createHmac('sha256', PASSWORD_RESET_SECRET).update(value).digest('hex');
+};
+
+const getAppBaseUrl = (req) => {
+  const fromEnv =
+    process.env.APP_BASE_URL ||
+    process.env.FRONTEND_URL ||
+    process.env.WEB_URL ||
+    '';
+
+  const clean = String(fromEnv).trim().replace(/\/$/, '');
+  if (clean) return clean;
+
+  // Fallback dev default
+  return 'http://localhost:5173';
+};
+
+const trySendPasswordResetEmail = async ({ to, resetUrl }) => {
+  const subject = 'Réinitialisation de votre mot de passe';
+  const text = `Bonjour,\n\nPour réinitialiser votre mot de passe, cliquez sur ce lien:\n${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n`;
+
+  const host = String(process.env.SMTP_HOST || '').trim();
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = String(process.env.SMTP_USER || '').trim();
+  const pass = String(process.env.SMTP_PASS || '').trim();
+  const from = String(process.env.SMTP_FROM || process.env.SMTP_USER || '').trim();
+  let secure = parseBool(process.env.SMTP_SECURE, port === 465);
+  const requireTLS = parseBool(process.env.SMTP_REQUIRE_TLS, port === 587);
+  const tlsRejectUnauthorized = parseBool(process.env.SMTP_TLS_REJECT_UNAUTHORIZED, true);
+
+  const smtpConfigured = !!(host && user && pass && from);
+  if (!smtpConfigured) {
+    // Pas de SMTP: ne pas casser le flux. En debug, on log le lien.
+    if (PASSWORD_RESET_DEBUG || process.env.NODE_ENV !== 'production') {
+      console.log('[password-reset] resetUrl:', resetUrl);
+    }
+    return { sent: false, reason: 'smtp_not_configured' };
   }
 
-  next();
-});
+  try {
+    const { default: nodemailer } = await import('nodemailer');
+
+    // Common pitfall: port 587 expects STARTTLS, not implicit TLS.
+    if (port === 587 && secure === true) {
+      console.warn('[password-reset] SMTP_SECURE=true with port 587; forcing SMTP_SECURE=false (STARTTLS).');
+      secure = false;
+    }
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      requireTLS,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: tlsRejectUnauthorized },
+    });
+
+    await transporter.sendMail({
+      from,
+      to,
+      subject,
+      text,
+    });
+
+    return { sent: true };
+  } catch (err) {
+    console.warn('[password-reset] email send failed:', err?.message || err);
+    if (PASSWORD_RESET_DEBUG || process.env.NODE_ENV !== 'production') {
+      console.log('[password-reset] resetUrl:', resetUrl);
+    }
+
+    return {
+      sent: false,
+      reason: 'smtp_send_failed',
+      errorCode: err?.code || err?.name || 'error',
+      errorMessage: String(err?.message || err || ''),
+    };
+  }
+};
 
 // Login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const { identifier, email, licenseNo, password } = req.body || {};
+    const rawIdentifier = String(identifier ?? email ?? licenseNo ?? '').trim();
+    const normalizedEmail = rawIdentifier.toLowerCase();
+    const normalizedLicenseNo = rawIdentifier.toUpperCase();
 
-    if (!email || !password) {
+    if (!rawIdentifier || !password) {
       await recordLoginAttempt({
-        email: normalizedEmail || null,
+        email: rawIdentifier || null,
         ipAddress: getClientIp(req),
         userAgent: req.headers['user-agent'] || null,
         success: false,
       });
       return res.status(400).json({
         success: false,
-        message: 'Email et mot de passe requis',
+        message: 'Identifiant et mot de passe requis',
       });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: { equals: normalizedEmail, mode: 'insensitive' } },
+          { licenseNo: { equals: normalizedLicenseNo, mode: 'insensitive' } },
+        ],
+      },
       include: USER_INCLUDE,
     });
 
     if (!user) {
       await recordLoginAttempt({
-        email: normalizedEmail || null,
+        email: rawIdentifier || null,
         ipAddress: getClientIp(req),
         userAgent: req.headers['user-agent'] || null,
         success: false,
@@ -176,12 +278,26 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    if (user.isActive === false) {
+      await recordLoginAttempt({
+        userId: user.id,
+        email: user.email || rawIdentifier,
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'] || null,
+        success: false,
+      });
+      return res.status(403).json({
+        success: false,
+        message: "Compte désactivé. Contactez l'administrateur.",
+      });
+    }
+
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
       await recordLoginAttempt({
         userId: user.id,
-        email: normalizedEmail,
+        email: user.email || rawIdentifier,
         ipAddress: getClientIp(req),
         userAgent: req.headers['user-agent'] || null,
         success: false,
@@ -195,7 +311,7 @@ router.post('/login', async (req, res) => {
     const token = buildToken(user);
     await recordLoginAttempt({
       userId: user.id,
-      email: normalizedEmail,
+      email: user.email || rawIdentifier,
       ipAddress: getClientIp(req),
       userAgent: req.headers['user-agent'] || null,
       success: true,
@@ -217,6 +333,137 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Mot de passe oublié
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { identifier, email, licenseNo } = req.body || {};
+    const raw = String(identifier ?? email ?? licenseNo ?? '').trim();
+
+    if (!raw) {
+      return res.status(400).json({ success: false, message: 'Email requis' });
+    }
+
+    const normalizedEmail = raw.toLowerCase();
+    const normalizedLicenseNo = raw.toUpperCase();
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: normalizedEmail },
+          { licenseNo: normalizedLicenseNo },
+        ],
+      },
+      select: { id: true, email: true, isActive: true },
+    });
+
+    // Réponse neutre pour éviter de révéler si l'utilisateur existe.
+    const genericResponse = {
+      success: true,
+      message: 'Si un compte existe, un lien de réinitialisation a été envoyé.',
+    };
+
+    if (!user || user.isActive === false || !user.email) {
+      return res.json(genericResponse);
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashResetToken(token);
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRES_MINUTES * 60 * 1000);
+
+    // Nettoyer les anciens tokens non utilisés (optionnel)
+    await prisma.passwordResetToken.deleteMany({
+      where: { userId: user.id, usedAt: null },
+    });
+
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+        usedAt: null,
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
+    const resetUrl = `${getAppBaseUrl(req)}/reset-password?token=${encodeURIComponent(token)}`;
+    const delivery = await trySendPasswordResetEmail({ to: user.email, resetUrl });
+
+    if (PASSWORD_RESET_DEBUG) {
+      return res.json({
+        ...genericResponse,
+        debugResetUrl: resetUrl,
+        debugEmailSent: delivery?.sent === true,
+        debugEmailReason: delivery?.sent ? null : (delivery?.reason || 'unknown'),
+        debugEmailErrorCode: delivery?.sent ? null : (delivery?.errorCode || null),
+        debugEmailErrorMessage: delivery?.sent ? null : (delivery?.errorMessage || null),
+      });
+    }
+
+    return res.json(genericResponse);
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// Réinitialiser le mot de passe
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword, password } = req.body || {};
+    const rawToken = String(token || '').trim();
+    const nextPassword = String(newPassword || password || '').trim();
+
+    if (!rawToken || !nextPassword) {
+      return res.status(400).json({ success: false, message: 'Token et nouveau mot de passe requis' });
+    }
+
+    if (!isStrongPassword(nextPassword)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mot de passe faible (8+ caracteres, majuscule, minuscule, chiffre, special).',
+      });
+    }
+
+    const now = new Date();
+    const tokenHash = hashResetToken(rawToken);
+
+    const record = await prisma.passwordResetToken.findFirst({
+      where: {
+        tokenHash,
+        usedAt: null,
+        expiresAt: { gt: now },
+      },
+      select: { id: true, userId: true },
+    });
+
+    if (!record) {
+      return res.status(400).json({ success: false, message: 'Token invalide ou expiré' });
+    }
+
+    const hashed = await bcrypt.hash(nextPassword, 10);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: record.userId },
+        data: { password: hashed },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: now },
+      }),
+      prisma.passwordResetToken.deleteMany({
+        where: { userId: record.userId, usedAt: null },
+      }),
+    ]);
+
+    return res.json({ success: true, message: 'Mot de passe mis à jour. Vous pouvez vous connecter.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
 // Verify token
 router.get('/verify', (req, res) => {
   try {
@@ -227,7 +474,7 @@ router.get('/verify', (req, res) => {
       return res.status(401).json({ valid: false, message: 'Missing token' });
     }
 
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, getJwtSecret());
     return res.json({ valid: true, user: payload });
   } catch (error) {
     return res.status(401).json({ valid: false, message: 'Invalid token' });
@@ -423,6 +670,94 @@ router.get('/me/login-history', auth(), async (req, res) => {
     return res.json({ success: true, items: history });
   } catch (error) {
     console.error('Login history error:', error);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+// Utilisateurs connectés récemment (approximation "en ligne")
+router.get('/connected-users', auth(['SUPER_ADMIN', 'FLEET_MANAGER']), async (req, res) => {
+  try {
+    if (!prisma?.loginHistory?.findMany) {
+      return res.json({ success: true, windowMinutes: 30, onlineCount: 0, totalUsers: 0, items: [] });
+    }
+
+    const windowMinutes = clampMinutes(req.query.windowMinutes, 30);
+    const cutoff = new Date(Date.now() - windowMinutes * 60 * 1000);
+    const isFleetManager = String(req.user?.role || '').toUpperCase() === 'FLEET_MANAGER';
+
+    const users = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        ...(isFleetManager ? { role: 'DRIVER' } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        roles: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    if (!users.length) {
+      return res.json({ success: true, windowMinutes, onlineCount: 0, totalUsers: 0, items: [] });
+    }
+
+    const userIds = users.map((u) => u.id);
+    const history = await prisma.loginHistory.findMany({
+      where: {
+        success: true,
+        userId: { in: userIds },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        userId: true,
+        ipAddress: true,
+        userAgent: true,
+        createdAt: true,
+      },
+    });
+
+    const latestByUserId = new Map();
+    for (const row of history) {
+      if (!row?.userId) continue;
+      if (!latestByUserId.has(row.userId)) latestByUserId.set(row.userId, row);
+    }
+
+    const items = users
+      .map((u) => {
+        const last = latestByUserId.get(u.id) || null;
+        const lastLoginAt = last?.createdAt || null;
+        const isOnline = !!(lastLoginAt && new Date(lastLoginAt) >= cutoff);
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          roles: Array.isArray(u.roles) ? u.roles : [],
+          isOnline,
+          lastLoginAt,
+          ipAddress: last?.ipAddress || null,
+          userAgent: last?.userAgent || null,
+        };
+      })
+      .sort((a, b) => {
+        const aTs = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
+        const bTs = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+        return bTs - aTs;
+      });
+
+    const onlineCount = items.filter((x) => x.isOnline).length;
+    return res.json({
+      success: true,
+      windowMinutes,
+      onlineCount,
+      totalUsers: items.length,
+      items,
+    });
+  } catch (error) {
+    console.error('Connected users error:', error);
     return res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });

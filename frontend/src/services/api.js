@@ -1,7 +1,7 @@
 // src/services/api.js
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Instance axios principale
 const api = axios.create({
@@ -11,6 +11,8 @@ const api = axios.create({
     'Content-Type': 'application/json',
   }
 });
+
+let redirectInProgress = false;
 
 // === FONCTIONS UTILITAIRES ===
 const getStoredToken = () => localStorage.getItem('token');
@@ -43,6 +45,7 @@ const redirectToLogin = () => {
 api.interceptors.request.use(
   (config) => {
     const token = getStoredToken();
+    config._hadToken = !!token;
     
     // Ajouter le token uniquement s'il existe
     if (token) {
@@ -72,49 +75,23 @@ api.interceptors.response.use(
   },
   (error) => {
     const originalRequest = error.config;
-    
+
     if (error.response) {
       const { status } = error.response;
-      
-      // Gestion des erreurs 401 (Unauthorized)
+
       if (status === 401) {
         console.warn('🔐 401 Unauthorized - Token invalid or expired');
-        
-        // Marquer cette requête comme traitée
-        if (!originalRequest._retryCount) {
-          originalRequest._retryCount = 1;
-        } else {
-          originalRequest._retryCount++;
-        }
-        
-        // Si c'est la première erreur 401, nettoyer et rediriger
-        if (originalRequest._retryCount <= 2) {
-          clearAuthStorage();
-          
-          // Rediriger après un court délai
-          setTimeout(() => {
-            redirectToLogin();
-          }, 500);
-        }
-      }
-      
-      // Gestion des erreurs 403 (Forbidden)
-      if (status === 403) {
+      } else if (status === 403) {
         console.warn('🚫 403 Forbidden - Insufficient permissions');
-      }
-      
-      // Gestion des erreurs 500 (Server Error)
-      if (status >= 500) {
+      } else if (status >= 500) {
         console.error('💥 Server Error', error.response.data);
       }
     } else if (error.request) {
-      // La requête a été faite mais pas de réponse
       console.error('🌐 Network Error - No response from server');
     } else {
-      // Erreur lors de la configuration de la requête
       console.error('⚙️ Request Error:', error.message);
     }
-    
+
     return Promise.reject(error);
   }
 );

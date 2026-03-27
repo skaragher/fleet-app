@@ -11,9 +11,13 @@ model User {
   id                 String              @id @default(cuid())
   name               String
   email              String              @unique
+  licenseNo          String?             @unique
   password           String
+  isActive           Boolean             @default(true)
+  deactivatedAt      DateTime?
   avatarUrl          String?
   role               UserRole            @default(VIEWER)
+  roles              UserRole[]          @default([])
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   assignedStationId  String?
@@ -22,7 +26,10 @@ model User {
   assignedStation    Station?            @relation("StationManagers", fields: [assignedStationId], references: [id])
   assignedVehicle    Vehicle?            @relation("VehicleManagers", fields: [assignedVehicleId], references: [id])
   vehicleAssignments VehicleAssignment[]
+  vehicleHistory     UserVehicleAssignment[] @relation("UserVehicleHistory")
+  assignedVehicleHistory UserVehicleAssignment[] @relation("UserVehicleAssignedBy")
   loginHistories     LoginHistory[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([assignedStationId])
   @@index([assignedVehicleId])
@@ -40,6 +47,23 @@ model LoginHistory {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
 }
 
 model Driver {
@@ -74,6 +98,29 @@ model Vehicle {
   maintenances      Maintenance[]
   managers          User[]              @relation("VehicleManagers")
   assignments       VehicleAssignment[]
+  userHistory       UserVehicleAssignment[] @relation("VehicleUserHistory")
+}
+
+model UserVehicleAssignment {
+  id           String   @id @default(cuid())
+  userId       String
+  vehicleId    String
+  userName     String?
+  userEmail    String?
+  assignedAt   DateTime @default(now())
+  unassignedAt DateTime?
+  assignedById String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  assignedBy   User?    @relation("UserVehicleAssignedBy", fields: [assignedById], references: [id])
+  user         User     @relation("UserVehicleHistory", fields: [userId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle  @relation("VehicleUserHistory", fields: [vehicleId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([vehicleId])
+  @@index([assignedAt])
+  @@index([unassignedAt])
 }
 
 model VehicleAssignment {
@@ -140,7 +187,11 @@ model FuelDispense {
   id          String   @id @default(cuid())
   stationId   String
   tankId      String
-  vehicleId   String
+  vehicleId   String?
+  privatePlate String?
+  privateMake String?
+  privateModel String?
+  privateFuelType FuelType?
   driverId    String?
   liters      Int
   unitPrice   Float?
@@ -150,7 +201,7 @@ model FuelDispense {
   driver      Driver?  @relation(fields: [driverId], references: [id])
   station     Station  @relation(fields: [stationId], references: [id])
   tank        Tank     @relation(fields: [tankId], references: [id])
-  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+  vehicle     Vehicle? @relation(fields: [vehicleId], references: [id])
 }
 
 model Maintenance {

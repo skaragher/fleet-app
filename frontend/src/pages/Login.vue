@@ -1,178 +1,143 @@
 <template>
-  <div class="flottech-auth">
-    <!-- Arrière-plan -->
-    <div class="energy-bg">
-      <div class="energy-flow"></div>
-      <div class="grid-overlay"></div>
-      <div class="particle-field"></div>
-    </div>
+  <div class="login-page">
+    <main class="login-shell">
+      <section class="promo-pane">
+        <div class="promo-brand-chip">FLEETENERGY</div>
 
-    <div class="auth-container">
-      <!-- Panneau info -->
-      <div class="info-panel">
-        <div class="brand-section">
-          <div class="logo-container">
-            <div class="fuel-icon">⛽</div>
-            <div class="icon-glow"></div>
-          </div>
-          <div class="brand-info">
-            <h1 class="brand-title">FLEETENERGY</h1>
-            <p class="brand-subtitle">Gestion Intelligente d'Énergie Mobile</p>
+        <div class="promo-main">
+          <div class="promo-logo">⛽</div>
+          <h1>Système de Gestion</h1>
+          <h2>Flotte & Énergie</h2>
+          <div class="promo-dots">
+            <span class="dot dot-active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
           </div>
         </div>
 
-        <div class="hero-content">
-          <h2>
-            Centralisez le contrôle de votre 
-            <span class="highlight">flotte</span> et 
-            <span class="highlight">carburant</span>
-          </h2>
-          <p class="description">
-            Plateforme intégrée pour le suivi en temps réel des consommations, 
-            des stocks et la maintenance préventive de votre parc.
-          </p>
+        <div class="promo-grid">
+          <article class="promo-card">
+            <div class="promo-icon">📅</div>
+            <p>Gestion des réunions</p>
+          </article>
+          <article class="promo-card">
+            <div class="promo-icon">📋</div>
+            <p>Gestion projet et automatisation</p>
+          </article>
+          <article class="promo-card">
+            <div class="promo-icon">🔒</div>
+            <p>Accès sécurisé</p>
+          </article>
+          <article class="promo-card">
+            <div class="promo-icon">🛡️</div>
+            <p>Données protégées</p>
+          </article>
         </div>
+      </section>
 
-        <div class="features-grid">
-          <div class="feature-card" v-for="feature in features" :key="feature.id">
-            <div class="feature-icon" :style="{ backgroundColor: feature.color + '20' }">
-              <span>{{ feature.icon }}</span>
-            </div>
-            <div class="feature-content">
-              <h4>{{ feature.title }}</h4>
-              <p>{{ feature.description }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <section class="auth-pane">
+        <header class="auth-header">
+          <h3>Bienvenue !</h3>
+          <p>Connectez-vous pour accéder à votre espace.</p>
+        </header>
 
-      <!-- Panneau auth -->
-      <div class="form-panel">
-        <div class="form-wrapper">
-          <div class="security-header">
-            <div class="security-badge">
-              <span class="lock-icon">🔐</span>
-              <span class="badge-text">PORTAL SÉCURISÉ</span>
-            </div>
-            <div class="welcome-message">
-              <h3>Accès Gestionnaire</h3>
-              <p>Veuillez vous identifier pour continuer</p>
-            </div>
+        <form class="auth-form" @submit.prevent="handleLogin">
+          <label for="email">Email</label>
+          <div class="input-wrap">
+            <span class="input-icon">✉</span>
+            <input
+              id="email"
+              v-model="email"
+              type="email"
+              placeholder="nom@entreprise.com"
+              autocomplete="username"
+              required
+            />
           </div>
 
-          <form @submit.prevent="handleLogin" class="auth-form">
-            <!-- Email -->
-            <div class="form-group">
-              <label for="email" class="form-label">
-                <span class="label-text">Identifiant</span>
-                <span class="label-hint">Votre email professionnel</span>
-              </label>
-              <div class="input-wrapper" :class="{ 'focused': emailFocused }">
-                <div class="input-icon">
-                  📧
-                </div>
-                <input
-                  id="email"
-                  v-model="email"
-                  type="email"
-                  placeholder="exemple@entreprise.fr"
-                  @focus="emailFocused = true"
-                  @blur="emailFocused = false"
-                  required
-                />
-                <div class="input-underline"></div>
-              </div>
-            </div>
-
-            <!-- Password -->
-            <div class="form-group">
-              <label for="password" class="form-label">
-                <span class="label-text">Mot de passe</span>
-              </label>
-              <div class="input-wrapper" :class="{ 'focused': passwordFocused }">
-                <div class="input-icon">🔒</div>
-                <input
-                  id="password"
-                  v-model="password"
-                  :type="showPassword ? 'text' : 'password'"
-                  placeholder="Votre mot de passe"
-                  @focus="passwordFocused = true"
-                  @blur="passwordFocused = false"
-                  required
-                />
-                <button
-                  type="button"
-                  class="password-toggle"
-                  @click="showPassword = !showPassword"
-                  :aria-label="showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
-                >
-                  👁️
-                </button>
-                <div class="input-underline"></div>
-              </div>
-            </div>
-
+          <label for="password">Mot de passe</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input
+              id="password"
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="Votre mot de passe"
+              autocomplete="current-password"
+              required
+            />
             <button
-              type="submit"
-              class="submit-button"
-              :disabled="auth.loading || !email || !password"
-              :class="{ 'loading': auth.loading }"
+              type="button"
+              class="toggle-btn"
+              @click="showPassword = !showPassword"
+              :aria-label="showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
             >
-              <span v-if="!auth.loading">Se connecter</span>
-              <span v-else>Chargement...</span>
+              {{ showPassword ? 'Masquer' : 'Afficher' }}
             </button>
+          </div>
 
-            <!-- Message d'erreur -->
-            <Transition name="slide-fade">
-              <div v-if="auth.error" class="error-message">
-                {{ auth.error }}
-                <button @click="auth.error = null">✖</button>
-              </div>
-            </Transition>
-          </form>
-        </div>
-      </div>
-    </div>
+          <div class="auth-row">
+            <label class="remember-me">
+              <input type="checkbox" />
+              <span>Se souvenir de moi</span>
+            </label>
+            <button type="button" class="forgot-link" @click="router.push({ name: 'ForgotPassword' })">
+              Mot de passe oublié ?
+            </button>
+          </div>
+
+          <button type="submit" class="submit-btn" :disabled="auth.loading || !email || !password">
+            {{ auth.loading ? 'Connexion...' : 'Se connecter' }}
+          </button>
+
+          <Transition name="fade-up">
+            <div v-if="auth.error" class="feedback-error">
+              <span>{{ auth.error }}</span>
+              <button type="button" @click="auth.error = null">×</button>
+            </div>
+          </Transition>
+        </form>
+      </section>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, onMounted } from "vue";
 import { useAuthStore } from "../stores/auth";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const auth = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 
-// Form state
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
-const emailFocused = ref(false);
-const passwordFocused = ref(false);
 
-// Features
-const features = ref([
-  { id: 1, icon: "📊", title: "Analytics Temps Réel", description: "Suivez les consommations et optimisez vos coûts", color: "#3b82f6" },
-  { id: 2, icon: "🛠️", title: "Maintenance Prédictive", description: "Anticipez les interventions et réduisez les temps d'arrêt", color: "#10b981" },
-  { id: 3, icon: "⛽", title: "Gestion de Carburant", description: "Contrôle des stocks et suivi des distributions", color: "#f59e0b" },
-  { id: 4, icon: "🚚", title: "Suivi de Flotte", description: "Localisation et optimisation des trajets", color: "#8b5cf6" }
-]);
-
-// Validate
 const validateForm = () => {
   auth.error = null;
-  if (!email.value.trim()) { auth.error = "L'email est requis"; return false; }
-  if (!password.value.trim()) { auth.error = "Le mot de passe est requis"; return false; }
+  if (!email.value.trim()) {
+    auth.error = "L'email est requis";
+    return false;
+  }
+  if (!password.value.trim()) {
+    auth.error = "Le mot de passe est requis";
+    return false;
+  }
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email.value.trim())) { auth.error = "Format d'email invalide"; return false; }
+  if (!emailRegex.test(email.value.trim())) {
+    auth.error = "Format d'email invalide";
+    return false;
+  }
+
   return true;
 };
 
-// Login handler
 const handleLogin = async () => {
   if (!validateForm()) return;
-  
+
   try {
     await auth.login(email.value, password.value);
 
@@ -181,142 +146,401 @@ const handleLogin = async () => {
       return;
     }
 
-    // Redirection selon rôle
-    switch(auth.user?.role) {
-      case 'SUPER_ADMIN':
-      case 'FLEET_MANAGER':
-      case 'VIEWER':
-        router.push('/');
-        break;
-      case 'STATION_MANAGER':
-        router.push('/stations');
-        break;
-      default:
-        router.push('/');
-        break;
+    const redirectFromQuery = route.query?.redirect;
+    const redirectFromSession = sessionStorage.getItem("post_login_redirect");
+    const redirectTarget =
+      (typeof redirectFromQuery === "string" && redirectFromQuery.startsWith("/") && redirectFromQuery) ||
+      (redirectFromSession && redirectFromSession.startsWith("/") && redirectFromSession) ||
+      null;
+
+    if (redirectTarget) {
+      sessionStorage.removeItem("post_login_redirect");
+      router.push(redirectTarget);
+      return;
     }
 
+    switch (auth.user?.role) {
+      case "SUPER_ADMIN":
+      case "FLEET_MANAGER":
+      case "VIEWER":
+        router.push("/");
+        break;
+      case "STATION_MANAGER":
+        router.push("/stations");
+        break;
+      default:
+        router.push("/");
+        break;
+    }
   } catch (err) {
     auth.error = "Erreur lors de la connexion";
     console.error(err);
   }
 };
+
+onMounted(() => {
+  if (route.query?.reason === "inactive") {
+    auth.error = "Session expirée après 10 minutes d'inactivité. Veuillez vous reconnecter.";
+  }
+});
 </script>
 
-
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
-.flottech-auth {
+.login-page {
   min-height: 100vh;
+  padding: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0a0a14;
-  font-family: 'Inter', sans-serif;
-  color: #ffffff;
-  position: relative;
-  overflow: hidden;
-  padding: 20px;
+  background: #d8deee;
+  font-family: 'Manrope', sans-serif;
 }
 
-/* === Arrière-plan énergétique === */
-.energy-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: hidden;
-}
-
-.energy-flow {
-  position: absolute;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    45deg,
-    transparent 30%,
-    rgba(59, 130, 246, 0.08) 50%,
-    transparent 70%
-  );
-  animation: flow 15s linear infinite;
-  top: -50%;
-  left: -50%;
-}
-
-@keyframes flow {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.grid-overlay {
-  position: absolute;
-  inset: 0;
-  background-image: 
-    linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-}
-
-.particle-field {
-  position: absolute;
-  inset: 0;
-  background: 
-    radial-gradient(1px 1px at 10% 20%, rgba(59, 130, 246, 0.4) 1px, transparent 2px),
-    radial-gradient(1px 1px at 30% 50%, rgba(99, 102, 241, 0.3) 1px, transparent 2px),
-    radial-gradient(1px 1px at 70% 30%, rgba(14, 165, 233, 0.4) 1px, transparent 2px),
-    radial-gradient(1.5px 1.5px at 90% 80%, rgba(6, 182, 212, 0.3) 1px, transparent 2px);
-  background-size: 200px 200px;
-  animation: particles 20s linear infinite;
-}
-
-@keyframes particles {
-  from { background-position: 0 0; }
-  to { background-position: 200px 200px; }
-}
-
-/* === Conteneur principal === */
-.auth-container {
-  display: flex;
+.login-shell {
   width: 100%;
-  max-width: 1400px;
-  min-height: 700px;
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(30px);
-  border: 1px solid rgba(59, 130, 246, 0.15);
-  border-radius: 32px;
+  max-width: 1220px;
+  min-height: min(700px, 92vh);
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 24px 56px -38px rgba(15, 23, 42, 0.45);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   overflow: hidden;
-  z-index: 10;
-  box-shadow: 
-    0 20px 80px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-/* === Panneau d'information === */
-.info-panel {
-  flex: 1.2;
-  padding: 60px;
-  background: linear-gradient(
-    135deg,
-    rgba(30, 58, 138, 0.3) 0%,
-    rgba(30, 41, 59, 0.5) 100%
-  );
-  border-right: 1px solid rgba(59, 130, 246, 0.1);
+.promo-pane {
+  padding: 24px 30px;
+  background: #dde3f7;
+  color: #1e3a8a;
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.slide-fade-enter-active {
-  transition: all 0.3s ease;
+.promo-brand-chip {
+  align-self: flex-start;
+  border: 1px solid #c7d2fe;
+  background: #ffffff;
+  color: #4338ca;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  border-radius: 10px;
+  padding: 8px 12px;
 }
 
-.slide-fade-leave-active {
-  transition: all 0.3s cubic-bezier(1, 0.5, 0.8, 1);
+.promo-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
 }
 
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  transform: translateY(-10px);
+.promo-logo {
+  width: 108px;
+  height: 64px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  background: #ffffff;
+  border: 1px solid #c7d2fe;
+  box-shadow: 0 14px 24px -20px rgba(30, 64, 175, 0.7);
+}
+
+.promo-pane h1 {
+  margin: 0;
+  font-size: clamp(30px, 3vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.promo-pane h2 {
+  margin: -2px 0 4px;
+  font-size: clamp(20px, 2vw, 26px);
+  color: #4f46e5;
+}
+
+.promo-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 10px;
+}
+
+.dot {
+  width: 18px;
+  height: 8px;
+  border-radius: 999px;
+  background: #a5b4fc;
+}
+
+.dot-active {
+  width: 52px;
+  background: #4f46e5;
+}
+
+.promo-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.promo-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #dbeafe;
+  padding: 18px 14px;
+  min-height: 105px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.promo-icon {
+  font-size: 24px;
+  color: #4f46e5;
+}
+
+.promo-card p {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 600;
+  text-align: center;
+}
+
+.auth-pane {
+  padding: 36px 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #ffffff;
+}
+
+.auth-header {
+  margin-bottom: 28px;
+}
+
+.auth-header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(30px, 2.2vw, 40px);
+  font-weight: 800;
+}
+
+.auth-header p {
+  margin: 6px 0 0;
+  color: #475569;
+  font-size: clamp(16px, 1.4vw, 22px);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-form label {
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  font-size: 18px;
+}
+
+.input-wrap input {
+  width: 100%;
+  height: 50px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 0 110px 0 34px;
+  font-size: 17px;
+  color: #0f172a;
+  background: #ffffff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-wrap input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.14);
+}
+
+.toggle-btn {
+  position: absolute;
+  right: 12px;
+  border: none;
+  background: transparent;
+  color: #4f46e5;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.remember-me {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #334155;
+}
+
+.remember-me input {
+  width: 18px;
+  height: 18px;
+}
+
+.forgot-link {
+  border: none;
+  background: transparent;
+  color: #4f46e5;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.submit-btn {
+  margin-top: 18px;
+  height: 52px;
+  border: none;
+  border-radius: 14px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  box-shadow: 0 20px 30px -22px rgba(79, 70, 229, 0.9);
+}
+
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.feedback-error {
+  margin-top: 14px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.feedback-error button {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.fade-up-enter-active,
+.fade-up-leave-active {
+  transition: all 0.25s ease;
+}
+
+.fade-up-enter-from,
+.fade-up-leave-to {
   opacity: 0;
+  transform: translateY(-8px);
+}
+
+@media (max-width: 980px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .promo-pane {
+    padding: 24px 20px;
+  }
+
+  .promo-main {
+    margin-top: 6px;
+  }
+
+  .promo-pane h1 {
+    font-size: 34px;
+  }
+
+  .promo-pane h2 {
+    font-size: 22px;
+  }
+
+  .promo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .promo-card p {
+    font-size: 15px;
+  }
+
+  .auth-pane {
+    padding: 24px 20px;
+  }
+
+  .auth-header h3 {
+    font-size: 36px;
+  }
+
+  .auth-header p {
+    font-size: 20px;
+  }
+
+  .auth-form label {
+    font-size: 18px;
+  }
+
+  .submit-btn {
+    font-size: 20px;
+    height: 50px;
+  }
 }
 </style>

@@ -14,7 +14,7 @@ const dispenseCreateSchema = z.object({
   driverId: z.string().optional().nullable(),
   liters: z.number().int().positive(),
   unitPrice: z.number().optional().nullable(),
-  odometerKm: z.number().int().nonnegative(),
+  odometerKm: z.number().int().nonnegative().optional().nullable(),
   dispensedAt: z.string().datetime().optional(),
   notes: z.string().optional().nullable(),
   privateVehicle: z
@@ -91,7 +91,12 @@ router.get("/", auth(), async (req, res, next) => {
     const items = await prisma.fuelDispense.findMany({
       where,
       orderBy: { dispensedAt: "desc" },
-      include: { station: true, tank: true, vehicle: true, driver: true }
+      include: {
+        station: true,
+        tank: { include: { station: true } },
+        vehicle: true,
+        driver: true,
+      }
     });
     res.json(items);
   } catch (e) { 
@@ -115,46 +120,35 @@ router.post("/", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_MANAGER"]
     }
     
     const result = await prisma.$transaction(async (tx) => {
-      let vehicleId = data.vehicleId;
+      const isPrivateFlow = !data.vehicleId && !!data.privateVehicle;
+      let vehicle = null;
+      const hasOdometer = data.odometerKm !== null && data.odometerKm !== undefined;
 
-      // Cas véhicule privé/non enregistré: on crée (ou réutilise) un véhicule avec ce matricule
-      if (!vehicleId && data.privateVehicle) {
-        const plate = String(data.privateVehicle.plate || "").trim().toUpperCase();
-        let privateVehicle = await tx.vehicle.findUnique({ where: { plate } });
-
-        if (!privateVehicle) {
-          const uniqueSuffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-          privateVehicle = await tx.vehicle.create({
-            data: {
-              plate,
-              make: data.privateVehicle.make || "PRIVE",
-              model: data.privateVehicle.model || "NON_ENREGISTRE",
-              fuelType: data.privateVehicle.fuelType,
-              odometerKm: data.odometerKm || 0,
-              status: "EN_SERVICE",
-              chassisNumber: `PRIVE-${uniqueSuffix}`,
-              commissioningDate: new Date(),
-            },
-          });
+      if (!isPrivateFlow) {
+        if (!hasOdometer) {
+          throw Object.assign(new Error("Kilométrage requis pour un véhicule de l'entreprise."), { status: 400 });
         }
-
-        vehicleId = privateVehicle.id;
+        // 1. Vérifier que le véhicule est en service et récupérer son kilométrage
+        vehicle = await tx.vehicle.findUnique({ where: { id: data.vehicleId } });
+        if (!vehicle) {
+          throw Object.assign(new Error("Véhicule introuvable."), { status: 400 });
+        }
+        if (vehicle.status !== "EN_SERVICE") {
+          throw Object.assign(new Error("Opération impossible : ce véhicule n'est pas en service."), { status: 400 });
+        }
+        // 2. Bloquer si le kilométrage saisi est inférieur au kilométrage actuel
+        if (data.odometerKm < vehicle.odometerKm) {
+          throw Object.assign(new Error(`Index incohérent : le compteur doit être ≥ ${vehicle.odometerKm} km.`), { status: 400 });
+        }
       }
 
-      // 1. Vérifier que le véhicule est en service et récupérer son kilométrage
-      const vehicle = await tx.vehicle.findUnique({ where: { id: vehicleId } });
-      
-      if (!vehicle || vehicle.status !== "EN_SERVICE") {
-        throw Object.assign(new Error("Opération impossible : ce véhicule n'est pas en service."), { status: 400 });
-      }
-
-      // 2. Bloquer si le kilométrage saisi est inférieur au kilométrage actuel
-      if (data.odometerKm < vehicle.odometerKm) {
-        throw Object.assign(new Error(`Index incohérent : le compteur doit être ≥ ${vehicle.odometerKm} km.`), { status: 400 });
-      }
+      const effectiveOdometerKm = hasOdometer ? Number(data.odometerKm) : 0;
 
       // 3. Vérifier le stock de la cuve
       const tank = await tx.tank.findUnique({ where: { id: data.tankId }});
+      if (!tank) {
+        throw Object.assign(new Error("Cuve introuvable."), { status: 400 });
+      }
       if (tank.currentL < data.liters) {
         throw Object.assign(new Error("Stock insuffisant dans la cuve"), { status: 400 });
       }
@@ -164,11 +158,15 @@ router.post("/", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_MANAGER"]
         data: {
           stationId: data.stationId,
           tankId: data.tankId,
-          vehicleId,
+          vehicleId: isPrivateFlow ? null : data.vehicleId,
+          privatePlate: isPrivateFlow ? String(data.privateVehicle.plate || "").trim().toUpperCase() : null,
+          privateMake: isPrivateFlow ? data.privateVehicle.make || null : null,
+          privateModel: isPrivateFlow ? data.privateVehicle.model || null : null,
+          privateFuelType: isPrivateFlow ? data.privateVehicle.fuelType : null,
           driverId: data.driverId || null,
           liters: data.liters,
           unitPrice: data.unitPrice || null,
-          odometerKm: data.odometerKm,
+          odometerKm: effectiveOdometerKm,
           dispensedAt: new Date(),
           notes: data.notes || null,
         }
@@ -176,7 +174,12 @@ router.post("/", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_MANAGER"]
 
       // 5. Mises à jour
       await tx.tank.update({ where: { id: tank.id }, data: { currentL: { decrement: data.liters } } });
-      await tx.vehicle.update({ where: { id: vehicleId }, data: { odometerKm: data.odometerKm } });
+      if (!isPrivateFlow && vehicle) {
+        await tx.vehicle.update({
+          where: { id: data.vehicleId },
+          data: { odometerKm: Math.max(Number(vehicle.odometerKm || 0), effectiveOdometerKm) },
+        });
+      }
 
       return dispense;
     });

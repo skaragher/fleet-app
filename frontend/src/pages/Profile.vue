@@ -257,7 +257,7 @@ const form = reactive({
 
 // Obtenir l'URL de base de l'API
 const getApiBaseUrl = () => {
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+  const apiUrl = import.meta.env.VITE_API_URL || "/api";
   // Enlever '/api' à la fin si présent
   const baseUrl = apiUrl.replace(/\/api\/?$/, "");
   console.log('API Base URL:', baseUrl);

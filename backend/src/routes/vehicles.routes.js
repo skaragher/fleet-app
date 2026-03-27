@@ -40,6 +40,33 @@ router.get("/:id", auth(), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get("/:id/driver-history", auth(), async (req, res, next) => {
+  try {
+    const scope = await buildUserScope(req.user);
+    const id = req.params.id;
+    if (scope.role === "DRIVER" && scope.assignedVehicleId && scope.assignedVehicleId !== id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    if (scope.role === "STATION_MANAGER" && !scope.allowedVehicleIds.includes(id)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const item = await prisma.vehicle.findUnique({ where: { id }, select: { id: true } });
+    if (!item) return res.status(404).json({ message: "Vehicle not found" });
+
+    const history = await prisma.userVehicleAssignment.findMany({
+      where: { vehicleId: id },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+        assignedBy: { select: { id: true, name: true, role: true } },
+        vehicle: { select: { id: true, plate: true, model: true } },
+      },
+      orderBy: { assignedAt: "desc" },
+    });
+    res.json(history);
+  } catch (e) { next(e); }
+});
+
 router.post("/", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req, res, next) => {
   try {
     const data = parse(vehicleSchema, req.body);

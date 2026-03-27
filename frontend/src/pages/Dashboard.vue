@@ -46,8 +46,51 @@
         <button @click="refreshData" class="retry-btn">Réessayer</button>
       </div>
 
+      <template v-if="isDriverMobile">
+        <div class="driver-mobile-grid">
+          <div class="driver-mobile-card">
+            <p class="driver-mobile-label">Mon véhicule</p>
+            <h3 class="driver-mobile-value">{{ driverVehicle?.plate || "Non assigné" }}</h3>
+            <p class="driver-mobile-sub">{{ driverVehicle?.model || "Aucun modèle" }}</p>
+          </div>
+          <div class="driver-mobile-card">
+            <p class="driver-mobile-label">Consommation moyenne</p>
+            <h3 class="driver-mobile-value">{{ Number(driverVehicle?.avgConsumption || 0).toFixed(1) }} L/100</h3>
+            <p class="driver-mobile-sub">Basée sur les derniers ravitaillements</p>
+          </div>
+          <div class="driver-mobile-card">
+            <p class="driver-mobile-label">Assurance</p>
+            <h3 class="driver-mobile-value">{{ driverInsuranceStatus }}</h3>
+            <p class="driver-mobile-sub">{{ driverInsuranceDateLabel }}</p>
+          </div>
+          <div class="driver-mobile-card">
+            <p class="driver-mobile-label">Visite technique</p>
+            <h3 class="driver-mobile-value">{{ driverInspectionStatus }}</h3>
+            <p class="driver-mobile-sub">{{ driverInspectionDateLabel }}</p>
+          </div>
+        </div>
+
+        <div class="card glass-white">
+          <h3>Mon prochain entretien</h3>
+          <div v-if="driverNextMaintenance" class="driver-mobile-line">
+            <strong>{{ driverNextMaintenance.description || "Entretien" }}</strong>
+            <span>{{ formatDate(driverNextMaintenance.dueAt) }} • {{ getDaysDiffLabel(driverNextMaintenance.dueAt) }}</span>
+          </div>
+          <p v-else class="no-data-small">Aucun entretien planifié.</p>
+        </div>
+
+        <div class="card glass-white">
+          <h3>Mon dernier ravitaillement</h3>
+          <div v-if="driverLastDispense" class="driver-mobile-line">
+            <strong>{{ Number(driverLastDispense.liters || 0).toLocaleString() }} L</strong>
+            <span>{{ formatDate(driverLastDispense.dispensedAt) }} • {{ formatCurrency(Number(driverLastDispense.liters || 0) * Number(driverLastDispense.unitPrice || 0)) }}</span>
+          </div>
+          <p v-else class="no-data-small">Aucun ravitaillement trouvé.</p>
+        </div>
+      </template>
+
       <!-- KPI Grid -->
-      <div v-if="!isStationManager" class="kpi-grid">
+      <div v-else-if="!isStationManager" class="kpi-grid">
         <div class="kpi-card glass blue">
           <div class="kpi-icon">🚚</div>
           <div class="kpi-content">
@@ -219,7 +262,7 @@
         </div>
       </template>
 
-      <template v-if="!isStationManager">
+      <template v-if="!isStationManager && !isDriverMobile">
       <!-- Charts Grid -->
       <div class="charts-grid mt-20">
         <div class="card glass-white chart-card">
@@ -646,21 +689,7 @@ Chart.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 // Dans Dashboard.vue, ajoutez cette fonction
 const handleApiError = (error) => {
   console.error('API Error:', error);
-  
-  if (error.response?.status === 401) {
-    // Token invalide - déconnexion propre
-    showNotification('Session expirée. Redirection...', 'error');
-    
-    setTimeout(() => {
-      // Utiliser le store d'authentification
-      const authStore = useAuthStore();
-      authStore.logout();
-    }, 1500);
-    
-    return true; // Erreur traitée
-  }
-  
-  return false; // Erreur non traitée
+  return false;
 };
 
 // Références
@@ -683,6 +712,66 @@ const supplies = computed(() => dashboardData.value?.supplies || []);
 const dispenses = computed(() => dashboardData.value?.dispenses || []);
 const isStationManager = computed(() => authStore.user?.role === "STATION_MANAGER");
 const isFleetManager = computed(() => authStore.user?.role === "FLEET_MANAGER");
+const isDriver = computed(() => authStore.user?.role === "DRIVER");
+const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200);
+const isMobile = computed(() => viewportWidth.value <= 768);
+const isDriverMobile = computed(() => isDriver.value && isMobile.value);
+const assignedVehicleId = computed(() => String(authStore.user?.assignedVehicleId || ""));
+const driverVehicle = computed(() =>
+  fleetData.value.find((v) => String(v.id) === assignedVehicleId.value) || null
+);
+const driverDispenses = computed(() =>
+  dispenses.value
+    .filter((d) => String(d.vehicleId || d.vehicle?.id || "") === assignedVehicleId.value)
+    .sort((a, b) => new Date(b.dispensedAt || 0) - new Date(a.dispensedAt || 0))
+);
+const driverLastDispense = computed(() => driverDispenses.value[0] || null);
+const driverInsurance = computed(() =>
+  latestInsurancesForOnlineVehicles.value.find(
+    (ins) => String(ins.vehicleId || ins.vehicle?.id || "") === assignedVehicleId.value
+  ) || null
+);
+const driverInspection = computed(() =>
+  latestInspectionsByVehicle.value.find(
+    (ins) => String(ins.vehicleId || ins.vehicle?.id || "") === assignedVehicleId.value
+  ) || null
+);
+const driverNextMaintenance = computed(() =>
+  maintenances.value
+    .filter((m) => String(m.vehicleId || m.vehicle?.id || "") === assignedVehicleId.value)
+    .sort((a, b) => new Date(a.dueAt || 0) - new Date(b.dueAt || 0))
+    .find((m) => m.status !== "DONE") || null
+);
+
+const driverInsuranceStatus = computed(() => {
+  if (!driverInsurance.value?.endAt) return "Aucune";
+  const diff = getInsuranceEndDaysDiff(driverInsurance.value.endAt);
+  if (diff === null) return "Inconnue";
+  if (diff < 0) return "Expirée";
+  if (diff <= 7) return "Critique";
+  if (diff <= 30) return "À renouveler";
+  return "Active";
+});
+
+const driverInsuranceDateLabel = computed(() => {
+  if (!driverInsurance.value?.endAt) return "Pas de contrat";
+  return `Expire le ${formatDate(driverInsurance.value.endAt)} (${getDaysDiffLabel(driverInsurance.value.endAt)})`;
+});
+
+const driverInspectionStatus = computed(() => {
+  const due = getInspectionDueDate(driverInspection.value);
+  if (!due) return "Aucune";
+  const diff = getDaysDiff(due);
+  if (diff < 0) return "En retard";
+  if (diff <= 14) return "Urgente";
+  return "Planifiée";
+});
+
+const driverInspectionDateLabel = computed(() => {
+  const due = getInspectionDueDate(driverInspection.value);
+  if (!due) return "Pas de visite planifiée";
+  return `Prochaine le ${formatDate(due)} (${getDaysDiffLabel(due)})`;
+});
 
 // --- Helpers ---
 const normalizeStatus = (status) => String(status || '').trim().toUpperCase();
@@ -1396,37 +1485,24 @@ const refreshData = async () => {
   error.value = null;
   
   try {
-    console.log('🔄 Loading dashboard data...');
-    
-    // Vérifier d'abord l'authentification
-    const authStore = useAuthStore();
-    if (!authStore.isAuthenticated) {
-      console.warn('User not authenticated, redirecting...');
-      authStore.logout();
-      return;
-    }
-    
     const res = await api.get("/dashboard");
     dashboardData.value = res.data;
     dataLoaded.value = true;
-    
-    // Vérifier s'il y a des alertes critiques
     checkCriticalAlerts();
-    
     showNotification('Données actualisées avec succès', 'success');
   } catch (e) {
-    console.error("Erreur de chargement", e);
-    
-    // Utiliser le handler d'erreur
-    const isAuthError = handleApiError(e);
-    
-    if (!isAuthError) {
-      error.value = "Impossible de charger les données. Vérifiez votre connexion.";
-      showNotification('Erreur lors du chargement des données', 'error');
-    }
+    const status = e?.response?.status;
+    const msg = e?.response?.data?.message || e?.message || 'Inconnue';
+    console.error("Erreur dashboard:", status, msg, e);
+    error.value = `Erreur ${status || 'réseau'} : ${msg}`;
+    showNotification('Erreur lors du chargement des données', 'error');
   } finally {
     loading.value = false;
   }
+};
+
+const handleResize = () => {
+  viewportWidth.value = window.innerWidth;
 };
 
 const checkCriticalAlerts = () => {
@@ -1499,12 +1575,14 @@ const checkCriticalAlerts = () => {
 // --- Lifecycle ---
 onMounted(() => {
   refreshData();
+  window.addEventListener("resize", handleResize);
   
   // Auto-refresh toutes les 5 minutes
   const interval = setInterval(refreshData, 5 * 60 * 1000);
   
   onUnmounted(() => {
     clearInterval(interval);
+    window.removeEventListener("resize", handleResize);
   });
 });
 
@@ -2420,6 +2498,47 @@ watch(selectedVehicle, (newVal) => {
   font-size: 13px;
 }
 
+.driver-mobile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.driver-mobile-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.driver-mobile-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.driver-mobile-value {
+  margin: 0;
+  font-size: 20px;
+  color: #0f172a;
+}
+
+.driver-mobile-sub {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #475569;
+}
+
+.driver-mobile-line {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #334155;
+}
+
 .empty {
   text-align: center;
   color: #64748b;
@@ -2826,6 +2945,10 @@ button:focus-visible,
   
   .section-title {
     font-size: 16px;
+  }
+
+  .driver-mobile-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

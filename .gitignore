@@ -5,15 +5,17 @@ node_modules/
 .env
 .env.local
 .env.production
+deploy/.env.production
 
 # Build folders
 dist/
 build/
 .next/
 out/
+frontend-dist/
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -26,3 +28,24 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# Uploads (fichiers générés par l'app)
+backend/uploads/avatars/*.jpg
+backend/uploads/avatars/*.png
+backend/uploads/avatars/*.jpeg
+backend/uploads/company-logos/*.jpg
+backend/uploads/company-logos/*.png
+backend/uploads/company-logos/*.jpeg
+
+# Données locales
+backend/data/
+
+# Documents de présentation (hors du code)
+*.docx
+*.pdf
+~$*
+
+# Prisma engine binaries
+backend/node_modules/.prisma/

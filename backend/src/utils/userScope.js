@@ -22,6 +22,7 @@ export const buildUserScope = async (authUser) => {
     where: { id: authUser.userId },
     select: {
       role: true,
+      roles: true,
       assignedVehicleId: true,
       assignedStationId: true,
       permissions: true,
@@ -33,9 +34,21 @@ export const buildUserScope = async (authUser) => {
   }
 
   const assignedStationIds = extractAssignedStationIds(user);
+  const allRoles = Array.from(new Set([user.role, ...(Array.isArray(user.roles) ? user.roles : [])].filter(Boolean)));
+  const hasRole = (role) => allRoles.includes(role);
+  const scopeRolePriority = [
+    "SUPER_ADMIN",
+    "FLEET_MANAGER",
+    "FUEL_MANAGER",
+    "VEHICLE_MANAGER",
+    "STATION_MANAGER",
+    "DRIVER",
+    "VIEWER",
+  ];
+  const effectiveRole = scopeRolePriority.find((r) => hasRole(r)) || user.role;
   let allowedVehicleIds = [];
 
-  if (user.role === "STATION_MANAGER" && assignedStationIds.length) {
+  if (hasRole("STATION_MANAGER") && assignedStationIds.length) {
     const links = await prisma.fuelDispense.findMany({
       where: { stationId: { in: assignedStationIds } },
       select: { vehicleId: true },
@@ -44,12 +57,13 @@ export const buildUserScope = async (authUser) => {
     allowedVehicleIds = links.map((x) => x.vehicleId).filter(Boolean);
   }
 
-  if (user.role === "DRIVER" && user.assignedVehicleId) {
+  if (hasRole("DRIVER") && user.assignedVehicleId) {
     allowedVehicleIds = [user.assignedVehicleId];
   }
 
   return {
-    role: user.role,
+    role: effectiveRole,
+    roles: allRoles,
     assignedVehicleId: user.assignedVehicleId || null,
     assignedStationIds,
     allowedVehicleIds,
@@ -58,4 +72,3 @@ export const buildUserScope = async (authUser) => {
 
 export const asStationPermissions = (stationIds = []) =>
   Array.from(new Set((stationIds || []).filter(Boolean))).map((id) => `${STATION_ASSIGN_PREFIX}${id}`);
-

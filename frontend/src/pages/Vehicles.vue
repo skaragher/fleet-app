@@ -1,5 +1,67 @@
 <template>
   <div class="page-container">
+    <template v-if="isDriverMobile">
+      <div class="mobile-driver-header">
+        <h2 class="title">🚗 Mon véhicule</h2>
+      </div>
+
+      <div v-if="driverVehicle" class="mobile-driver-card">
+        <div class="mobile-driver-line">
+          <span>Plaque</span>
+          <strong>{{ driverVehicle.plate }}</strong>
+        </div>
+        <div class="mobile-driver-line">
+          <span>Modèle</span>
+          <strong>{{ driverVehicle.make || "—" }} {{ driverVehicle.model || "" }}</strong>
+        </div>
+        <div class="mobile-driver-line">
+          <span>Kilométrage</span>
+          <strong>{{ Number(driverVehicle.odometerKm || 0).toLocaleString() }} km</strong>
+        </div>
+        <div class="mobile-driver-line">
+          <span>Statut</span>
+          <strong>{{ String(driverVehicle.status || "").replaceAll("_", " ") || "—" }}</strong>
+        </div>
+      </div>
+
+      <div v-if="driverVehicle" class="mobile-driver-card">
+        <h3>Dernier ravitaillement</h3>
+        <p v-if="driverLastDispense">
+          {{ formatDate(driverLastDispense.dispensedAt) }} • {{ Number(driverLastDispense.liters || 0).toLocaleString() }} L
+        </p>
+        <p v-else class="muted">Aucun ravitaillement trouvé.</p>
+      </div>
+
+      <div v-if="driverVehicle" class="mobile-driver-card">
+        <h3>Assurance</h3>
+        <p v-if="driverLatestInsurance">
+          Expire le {{ formatDate(driverLatestInsurance.endAt) }}
+        </p>
+        <p v-else class="muted">Aucune assurance trouvée.</p>
+      </div>
+
+      <div v-if="driverVehicle" class="mobile-driver-card">
+        <h3>Visite technique</h3>
+        <p v-if="driverLatestInspection">
+          Prochaine: {{ formatDate(driverLatestInspection.nextInspect || driverLatestInspection.scheduledAt) }}
+        </p>
+        <p v-else class="muted">Aucune visite trouvée.</p>
+      </div>
+
+      <div v-if="driverVehicle" class="mobile-driver-card">
+        <h3>Maintenance</h3>
+        <p v-if="driverNextMaintenance">
+          {{ driverNextMaintenance.description || "Entretien" }} • {{ formatDate(driverNextMaintenance.dueAt) }}
+        </p>
+        <p v-else class="muted">Aucune maintenance planifiée.</p>
+      </div>
+
+      <div v-if="!driverVehicle" class="empty-state">
+        Aucun véhicule assigné à ce compte chauffeur.
+      </div>
+    </template>
+
+    <template v-else>
     <div class="header-flex">
       <h2 class="title">🚗 Gestion du Parc <span class="badge">{{ items.length }}</span></h2>
       <transition name="shake">
@@ -18,8 +80,16 @@
           <input v-model="form.chassisNumber" placeholder="N° Châssis" />
         </div>
         <div class="input-group mini">
+          <label>Marque</label>
+          <input v-model="form.make" placeholder="Ex: Toyota" />
+        </div>
+        <div class="input-group mini">
           <label>Modèle</label>
           <input v-model="form.model" placeholder="Ex: Hilux" />
+        </div>
+        <div class="input-group mini">
+          <label>Mise en circulation</label>
+          <input type="date" v-model="form.commissioningDate" />
         </div>
         <div class="input-group mini">
           <label>Carburant</label>
@@ -63,6 +133,7 @@
               <th>Véhicule</th>
               <th>Marque/Model</th>
               <th>Carburant</th>
+              <th>Mise en circulation</th>
               <th>Kilométrage</th>
               <th>Statut</th>
               <th class="text-right">Actions</th>
@@ -76,6 +147,7 @@
               </td>
               <td>{{ v.make }} {{ v.model }}</td>
               <td><span :class="['pill-fuel', v.fuelType.toLowerCase()]">{{ v.fuelType }}</span></td>
+              <td>{{ formatDate(v.commissioningDate) }}</td>
               <td class="km-cell">{{ v.odometerKm.toLocaleString() }} km</td>
               <td>
                 <div class="status-wrapper">
@@ -87,6 +159,9 @@
                 <button class="btn-edit" @click="prepareEdit(v)" title="Modifier">
                       <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     </button>
+                <button class="btn-history" @click="loadDriverHistory(v)" title="Historique chauffeurs">
+                      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 3v5h5"></path><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path><path d="M12 7v5l3 3"></path></svg>
+                    </button>
                 <button class="btn-del" @click="remove(v.id)" title="Supprimer">
                       <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
@@ -97,21 +172,73 @@
       </div>
       <div v-if="items.length === 0" class="empty-state">Aucun véhicule dans la base.</div>
     </div>
+
+    <div v-if="selectedHistoryVehicle" class="table-card history-card">
+      <div class="history-head">
+        <h3>Historique chauffeurs - {{ selectedHistoryVehicle.plate }}</h3>
+        <button class="btn-cancel" @click="clearDriverHistory">Fermer</button>
+      </div>
+
+      <div v-if="historyError" class="error-pill">⚠️ {{ historyError }}</div>
+      <div v-else-if="loadingHistory" class="empty-state">Chargement de l'historique...</div>
+      <div v-else-if="!vehicleDriverHistory.length" class="empty-state">Aucun historique d'affectation.</div>
+
+      <div v-else class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Chauffeur</th>
+              <th>Début</th>
+              <th>Fin</th>
+              <th>Affecté par</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="h in vehicleDriverHistory" :key="h.id">
+              <td>
+                <div class="primary-td">{{ h.user?.name || h.userName || "—" }}</div>
+                <div class="secondary-td">{{ h.user?.email || h.userEmail || "—" }}</div>
+              </td>
+              <td>{{ formatDateTime(h.assignedAt) }}</td>
+              <td>{{ h.unassignedAt ? formatDateTime(h.unassignedAt) : "En cours" }}</td>
+              <td>{{ h.assignedBy?.name || "Système" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import api from "../services/api";
+import { useAuthStore } from "../stores/auth";
 
 const items = ref([]);
 const error = ref("");
 const editingId = ref(null);
+const authStore = useAuthStore();
+const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200);
+const isMobile = computed(() => viewportWidth.value <= 768);
+const isDriver = computed(() => authStore.user?.role === "DRIVER");
+const isDriverMobile = computed(() => isDriver.value && isMobile.value);
+const assignedVehicleId = computed(() => String(authStore.user?.assignedVehicleId || ""));
+const driverDispenses = ref([]);
+const driverInsurances = ref([]);
+const driverInspections = ref([]);
+const driverMaintenances = ref([]);
+const selectedHistoryVehicle = ref(null);
+const vehicleDriverHistory = ref([]);
+const loadingHistory = ref(false);
+const historyError = ref("");
 
 const initialForm = {
   plate: "",
   make: "",
   model: "",
+  commissioningDate: "",
   fuelType: "DIESEL",
   chassisNumber: "",
   odometerKm: 0,
@@ -122,18 +249,29 @@ const form = ref({ ...initialForm });
 
 async function load() {
   try {
-    const res = await api.get("/vehicles");
-    items.value = res.data || [];
+    const requests = [api.get("/vehicles")];
+    if (isDriver.value) {
+      requests.push(api.get("/fuel/dispenses"));
+      requests.push(api.get("/insurance"));
+      requests.push(api.get("/inspections"));
+      requests.push(api.get("/maintenance"));
+    }
+
+    const [vehiclesRes, dispensesRes, insurancesRes, inspectionsRes, maintenancesRes] = await Promise.all(requests);
+    items.value = vehiclesRes.data || [];
+    driverDispenses.value = dispensesRes?.data || [];
+    driverInsurances.value = insurancesRes?.data || [];
+    driverInspections.value = inspectionsRes?.data || [];
+    driverMaintenances.value = maintenancesRes?.data || [];
   } catch (e) { console.error("Erreur de chargement", e); }
 }
 
 async function create() {
   error.value = "";
   try {
-    // commissioningDate ajouté pour valider vehicleSchema.datetime()
-    await api.post("/vehicles", { 
-      ...form.value, 
-      commissioningDate: new Date().toISOString() 
+    await api.post("/vehicles", {
+      ...form.value,
+      commissioningDate: toIsoDateOrNull(form.value.commissioningDate),
     });
     form.value = { ...initialForm };
     await load();
@@ -144,7 +282,10 @@ async function create() {
 
 function prepareEdit(v) {
   editingId.value = v.id;
-  form.value = { ...v };
+  form.value = {
+    ...v,
+    commissioningDate: toInputDate(v.commissioningDate),
+  };
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -157,7 +298,10 @@ function cancelEdit() {
 async function update() {
   error.value = "";
   try {
-    await api.put(`/vehicles/${editingId.value}`, form.value);
+    await api.put(`/vehicles/${editingId.value}`, {
+      ...form.value,
+      commissioningDate: toIsoDateOrNull(form.value.commissioningDate),
+    });
     cancelEdit();
     await load();
   } catch (e) {
@@ -183,7 +327,82 @@ async function remove(id) {
   }
 }
 
-onMounted(load);
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("fr-FR");
+};
+
+function clearDriverHistory() {
+  selectedHistoryVehicle.value = null;
+  vehicleDriverHistory.value = [];
+  historyError.value = "";
+}
+
+async function loadDriverHistory(vehicle) {
+  selectedHistoryVehicle.value = vehicle;
+  vehicleDriverHistory.value = [];
+  historyError.value = "";
+  loadingHistory.value = true;
+  try {
+    const res = await api.get(`/vehicles/${vehicle.id}/driver-history`);
+    vehicleDriverHistory.value = res.data || [];
+  } catch (e) {
+    historyError.value = e?.response?.data?.message || "Impossible de charger l'historique du véhicule.";
+  } finally {
+    loadingHistory.value = false;
+  }
+}
+
+const driverVehicle = computed(() => items.value.find((v) => String(v.id) === assignedVehicleId.value) || null);
+const driverLastDispense = computed(() =>
+  driverDispenses.value
+    .filter((d) => String(d.vehicleId || d.vehicle?.id || "") === assignedVehicleId.value)
+    .sort((a, b) => new Date(b.dispensedAt || 0) - new Date(a.dispensedAt || 0))[0] || null
+);
+const driverLatestInsurance = computed(() =>
+  driverInsurances.value
+    .filter((i) => String(i.vehicleId || i.vehicle?.id || "") === assignedVehicleId.value)
+    .sort((a, b) => new Date(b.endAt || 0) - new Date(a.endAt || 0))[0] || null
+);
+const driverLatestInspection = computed(() =>
+  driverInspections.value
+    .filter((i) => String(i.vehicleId || i.vehicle?.id || "") === assignedVehicleId.value)
+    .sort((a, b) => new Date((b.nextInspect || b.scheduledAt || 0)) - new Date((a.nextInspect || a.scheduledAt || 0)))[0] || null
+);
+const driverNextMaintenance = computed(() =>
+  driverMaintenances.value
+    .filter((m) => String(m.vehicleId || m.vehicle?.id || "") === assignedVehicleId.value)
+    .filter((m) => m.status !== "DONE")
+    .sort((a, b) => new Date(a.dueAt || 0) - new Date(b.dueAt || 0))[0] || null
+);
+
+const toIsoDateOrNull = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+};
+
+const toInputDate = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+};
+
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString("fr-FR") : "—");
+const handleResize = () => { viewportWidth.value = window.innerWidth; };
+
+onMounted(() => {
+  load();
+  window.addEventListener("resize", handleResize);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", handleResize);
+});
 </script>
 
 <style scoped>
@@ -245,12 +464,61 @@ onMounted(load);
 .text-right { text-align: right; }
 .btn-icon { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 6px; transition: 0.2s; font-size: 1rem; }
 .btn-edit { color: #007bff; background: none; border: none; cursor: pointer; }
+.btn-history { color: #1d4ed8; background: none; border: none; cursor: pointer; margin: 0 8px; }
 .btn-del { color: #dc3545; background: none; border: none; cursor: pointer; }
+.history-card { margin-top: 16px; padding: 12px; }
+.history-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 4px 10px; }
+.history-head h3 { margin: 0; font-size: 1rem; color: #1e293b; font-weight: 800; }
 .btn-icon.edit:hover { background: #e0e7ff; }
 .btn-icon.trash:hover { background: #fee2e2; }
 
 .row-editing { background-color: #f0f7ff !important; }
 .empty-state { padding: 40px; text-align: center; color: #94a3b8; font-style: italic; }
+
+.mobile-driver-header {
+  margin-bottom: 12px;
+}
+
+.mobile-driver-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.mobile-driver-card h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.mobile-driver-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.mobile-driver-line:last-child {
+  border-bottom: none;
+}
+
+.mobile-driver-line span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.mobile-driver-line strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.muted {
+  color: #64748b;
+  font-size: 12px;
+}
 
 @media (max-width: 900px) {
   .input-group { flex: 1 1 calc(50% - 12px); }

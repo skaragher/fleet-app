@@ -1,0 +1,122 @@
+name: 🚀 Deploy Fleet App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # Permet de lancer manuellement depuis GitHub
+
+env:
+  SERVER_IP: 193.168.173.181
+  SERVER_USER: root
+  APP_DIR: /var/www/fleet-app
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # ─── 1. Checkout ──────────────────────────────────────────
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      # ─── 2. Setup Node.js ─────────────────────────────────────
+      - name: 🟢 Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # ─── 3. Build frontend Vue 3 ──────────────────────────────
+      - name: 🔨 Build frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run build
+        env:
+          VITE_API_URL: /api
+
+      # ─── 4. Setup SSH ─────────────────────────────────────────
+      - name: 🔑 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.SERVER_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      # ─── 5. Upload frontend buildé ────────────────────────────
+      - name: 📤 Upload frontend
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            frontend/dist/ \
+            ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:${{ env.APP_DIR }}/frontend/
+
+      # ─── 6. Upload backend ────────────────────────────────────
+      - name: 📤 Upload backend
+        run: |
+          rsync -avz \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            --exclude='data/' \
+            --exclude='uploads/avatars/*.jpg' \
+            --exclude='uploads/avatars/*.png' \
+            --exclude='uploads/company-logos/' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            backend/ \
+            ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:${{ env.APP_DIR }}/backend/
+
+      # ─── 7. Upload configs de déploiement ────────────────────
+      - name: 📤 Upload deploy configs
+        run: |
+          rsync -avz \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            deploy/ \
+            ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:${{ env.APP_DIR }}/deploy/
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ env.SERVER_USER }}@${{ env.SERVER_IP }} \
+            "chmod +x ${{ env.APP_DIR }}/deploy/*.sh"
+
+      # ─── 8. Déployer sur le serveur ───────────────────────────
+      - name: 🚀 Deploy on server
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ env.SERVER_USER }}@${{ env.SERVER_IP }} << 'ENDSSH'
+            set -e
+            APP_DIR="/var/www/fleet-app"
+            BACKEND_DIR="${APP_DIR}/backend"
+
+            echo "── 1. Vérification .env ──"
+            if [ ! -f "${BACKEND_DIR}/.env" ]; then
+              echo "❌ .env manquant ! Créez-le sur le serveur :"
+              echo "   cp ${APP_DIR}/deploy/.env.production ${BACKEND_DIR}/.env"
+              echo "   (puis éditez les valeurs)"
+              exit 1
+            fi
+
+            echo "── 2. npm install ──"
+            cd "${BACKEND_DIR}"
+            npm install --omit=dev
+
+            echo "── 3. Prisma generate & migrate ──"
+            npx prisma generate
+            npx prisma migrate deploy
+
+            echo "── 4. Redémarrage PM2 ──"
+            pm2 restart fleet-backend 2>/dev/null || \
+              pm2 start src/server.js \
+                --name fleet-backend \
+                --env production \
+                --output "${APP_DIR}/logs/backend.log" \
+                --error "${APP_DIR}/logs/backend-error.log"
+            pm2 save
+
+            echo "── 5. Reload Nginx ──"
+            nginx -t && systemctl reload nginx
+
+            echo ""
+            echo "✅ Déploiement terminé avec succès !"
+            echo "🌍 http://193.168.173.181"
+            pm2 status
+          ENDSSH

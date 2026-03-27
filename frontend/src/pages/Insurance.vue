@@ -1,198 +1,252 @@
 <template>
   <div class="insurance">
-    <!-- Header -->
-    <header class="header">
+    <!-- Header avec effet de verre -->
+    <header class="header glass-effect">
       <div class="header-left">
-        <h1>Assurances</h1>
-        <p class="date">{{ today }}</p>
+        <div class="title-with-icon">
+          <span class="header-icon">🛡️</span>
+          <h1>Gestion des Assurances</h1>
+        </div>
+        <p class="date">
+          <span class="date-icon">📅</span>
+          {{ today }}
+        </p>
       </div>
       <div class="header-actions">
         <button class="btn btn-outline" :disabled="loading" @click="loadData">
-          <span class="btn-icon">↻</span>
-          Actualiser
+          <span class="btn-icon" :class="{ 'spin': loading }">↻</span>
+          {{ loading ? 'Chargement...' : 'Actualiser' }}
         </button>
-        <button class="btn btn-outline" :disabled="submitting" @click="resetForm">
+        <button class="btn btn-primary" :disabled="submitting" @click="resetForm">
           <span class="btn-icon">+</span>
-          Nouveau
+          Nouveau contrat
         </button>
       </div>
     </header>
 
-    <!-- KPIs -->
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-icon blue">📄</div>
-        <div class="kpi-content">
-          <span class="kpi-label">Polices actives</span>
-          <span class="kpi-value">{{ activePolicies }}</span>
-          <span class="kpi-trend">Total contrats</span>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon indigo">💰</div>
-        <div class="kpi-content">
-          <span class="kpi-label">Montant total</span>
-          <span class="kpi-value">{{ compactAmount(totalPremium) }}</span>
-          <span class="kpi-trend">Somme assurée</span>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon orange">⏳</div>
-        <div class="kpi-content">
-          <span class="kpi-label">À renouveler</span>
-          <span class="kpi-value">{{ expiringSoon }}</span>
-          <span class="kpi-trend">30 prochains jours</span>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon red">🚨</div>
-        <div class="kpi-content">
-          <span class="kpi-label">Expirées</span>
-          <span class="kpi-value">{{ expiredPolicies }}</span>
-          <span class="kpi-trend">Action requise</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Formulaire -->
-    <div class="card">
+    <!-- Formulaire avec design moderne -->
+    <div class="card glass-effect" :class="{ 'editing-card': isEditing }">
       <div class="card-header">
-        <h2>{{ isEditing ? 'Modifier le contrat' : 'Nouveau contrat' }}</h2>
-        <button v-if="isEditing" class="btn btn-text" @click="cancelEdit">
+        <div class="card-title">
+          <span class="card-icon">{{ isEditing ? '✏️' : '➕' }}</span>
+          <h2>{{ isEditing ? 'Modification du contrat' : 'Création d\'un nouveau contrat' }}</h2>
+        </div>
+        <button v-if="isEditing" class="btn btn-ghost" @click="cancelEdit">
+          <span class="btn-icon">✕</span>
           Annuler
         </button>
       </div>
 
       <div class="form">
+        <!-- Ligne 1 : Véhicule et Assureur -->
         <div class="form-row">
-          <div class="form-group">
-            <label>Véhicule <span class="required">*</span></label>
-            <select v-model="form.vehicleId" :class="{ error: submitted && !form.vehicleId }" @change="onVehicleChange">
-              <option value="" disabled>Sélectionner un véhicule</option>
-              <option
-                v-for="v in selectableVehicles"
-                :key="v.id"
-                :value="v.id"
-                :disabled="isVehicleInRepair(v)"
-              >
-                {{ v.plate }} - {{ v.model || 'N/A' }}{{ isVehicleInRepair(v) ? ' (EN RÉPARATION)' : '' }}
-              </option>
-            </select>
+          <div class="form-group enhanced">
+            <label>
+              <span class="label-icon">🚗</span>
+              Véhicule <span class="required">*</span>
+            </label>
+            <div class="select-wrapper">
+              <select v-model="form.vehicleId" :class="{ error: submitted && !form.vehicleId }" @change="onVehicleChange">
+                <option value="" disabled>Sélectionner un véhicule</option>
+                <option
+                  v-for="v in selectableVehicles"
+                  :key="v.id"
+                  :value="v.id"
+                  :disabled="isVehicleInRepair(v)"
+                >
+                  {{ v.plate }} - {{ v.model || 'N/A' }}{{ isVehicleInRepair(v) ? ' (EN RÉPARATION)' : '' }}
+                </option>
+              </select>
+              <span class="select-arrow">▼</span>
+            </div>
             <div v-if="form.vehicleId" class="field-hint" :class="hasActiveInsurance(form.vehicleId) ? 'warning' : 'success'">
+              <span class="hint-icon">{{ hasActiveInsurance(form.vehicleId) ? '⚠️' : '✅' }}</span>
               <span v-if="hasActiveInsurance(form.vehicleId)">
-                ⚠️ Assurance active jusqu'au {{ formatDate(getActiveInsurance(form.vehicleId)?.endAt) }}
+                Assurance active jusqu'au {{ formatDate(getActiveInsurance(form.vehicleId)?.endAt) }}
               </span>
-              <span v-else>✅ Aucune assurance active</span>
+              <span v-else>Aucune assurance active</span>
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Assureur <span class="required">*</span></label>
-            <select v-model="form.insurerId" :class="{ error: submitted && !form.insurerId }" @change="handleInsurerChange">
-              <option value="" disabled>Sélectionner un assureur</option>
-              <option v-for="ins in insurers" :key="ins.id" :value="ins.id">{{ ins.name }}</option>
-              <option value="NEW">+ Ajouter un assureur</option>
-            </select>
+          <div class="form-group enhanced">
+            <label>
+              <span class="label-icon">🏢</span>
+              Assureur <span class="required">*</span>
+            </label>
+            <div class="select-wrapper">
+              <select v-model="form.insurerId" :class="{ error: submitted && !form.insurerId }" @change="handleInsurerChange">
+                <option value="" disabled>Sélectionner un assureur</option>
+                <option v-for="ins in insurers" :key="ins.id" :value="ins.id">{{ ins.name }}</option>
+                <option value="NEW" class="add-option">+ Ajouter un assureur</option>
+              </select>
+              <span class="select-arrow">▼</span>
+            </div>
           </div>
         </div>
 
-        <!-- Nouvel assureur -->
-        <div v-if="showNewInsurerInput" class="form-row">
-          <div class="form-group">
+        <!-- Nouvel assureur (conditionnel) -->
+        <div v-if="showNewInsurerInput" class="form-row animate-slide">
+          <div class="form-group enhanced">
             <label>Nom du nouvel assureur</label>
             <div class="input-group">
-              <input v-model.trim="newInsurerName" type="text" placeholder="Ex: AXA Assurance" />
-              <button class="btn btn-primary" :disabled="!newInsurerName" @click="saveNewInsurer">
+              <input v-model.trim="newInsurerName" type="text" placeholder="Ex: AXA Assurance" class="enhanced-input" />
+              <button class="btn btn-success" :disabled="!newInsurerName" @click="saveNewInsurer">
+                <span class="btn-icon">✓</span>
                 Ajouter
               </button>
             </div>
           </div>
         </div>
 
+        <!-- Ligne 2 : Type et N° police -->
         <div class="form-row">
-          <div class="form-group">
-            <label>Type de couverture <span class="required">*</span></label>
-            <select v-model="form.insurancesType">
-              <option value="TIERS">Tiers Simple</option>
-              <option value="INTERMEDIAIRE">Intermédiaire</option>
-              <option value="TOUS_RISQUES">Tous Risques</option>
-              <option value="RC">Responsabilité Civile</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>N° de police <span class="required">*</span></label>
-            <input v-model.trim="form.policyNo" type="text" placeholder="POL-2025-001" 
-                   :class="{ error: submitted && !form.policyNo }" />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Date de début <span class="required">*</span></label>
-            <input v-model="form.startAt" type="date" @change="calculateEndDate" />
-          </div>
-
-          <div class="form-group">
-            <label>Durée</label>
-            <div class="duration-group">
-              <input v-model.number="form.durationValue" type="number" min="1" @input="calculateEndDate" />
-              <select v-model="form.durationUnit" @change="calculateEndDate">
-                <option value="months">Mois</option>
-                <option value="years">Années</option>
+          <div class="form-group enhanced">
+            <label>
+              <span class="label-icon">📋</span>
+              Type de couverture <span class="required">*</span>
+            </label>
+            <div class="select-wrapper">
+              <select v-model="form.insurancesType">
+                <option value="TIERS">🔹 Tiers Simple</option>
+                <option value="INTERMEDIAIRE">🔸 Intermédiaire</option>
+                <option value="TOUS_RISQUES">🌟 Tous Risques</option>
+                <option value="RC">⚖️ Responsabilité Civile</option>
               </select>
+              <span class="select-arrow">▼</span>
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Date d'échéance</label>
-            <input v-model="form.endAt" type="date" readonly class="readonly" />
+          <div class="form-group enhanced">
+            <label>
+              <span class="label-icon">🔖</span>
+              N° de police <span class="required">*</span>
+            </label>
+            <input v-model.trim="form.policyNo" type="text" placeholder="POL-2025-001" 
+                   :class="{ error: submitted && !form.policyNo }" class="enhanced-input" />
           </div>
         </div>
 
+        <!-- Ligne 3 : Dates et durée -->
+        <div class="form-row date-row">
+          <div class="form-group enhanced">
+            <label>
+              <span class="label-icon">📅</span>
+              Date de début <span class="required">*</span>
+            </label>
+            <input v-model="form.startAt" type="date" @change="calculateEndDate" class="enhanced-input" />
+          </div>
+
+          <div class="form-group enhanced">
+            <label>
+              <span class="label-icon">⏱️</span>
+              Durée
+            </label>
+            <div class="duration-group">
+              <input v-model.number="form.durationValue" type="number" min="1" @input="calculateEndDate" class="enhanced-input" />
+              <div class="select-wrapper small">
+                <select v-model="form.durationUnit" @change="calculateEndDate">
+                  <option value="months">Mois</option>
+                  <option value="years">Années</option>
+                </select>
+                <span class="select-arrow">▼</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group enhanced">
+            <label>
+              <span class="label-icon">⏰</span>
+              Date d'échéance
+            </label>
+            <input v-model="form.endAt" type="date" readonly class="enhanced-input readonly" />
+            <span class="date-hint">Calculée automatiquement</span>
+          </div>
+        </div>
+
+        <!-- Ligne 4 : Coût -->
         <div class="form-row">
-          <div class="form-group">
-            <label>Coût annuel (FCFA) <span class="required">*</span></label>
-            <input v-model.number="form.premium" type="number" min="0" step="1000" 
-                   :class="{ error: submitted && !form.premium }" />
+          <div class="form-group enhanced">
+            <label>
+              <span class="label-icon">💰</span>
+              Coût annuel <span class="required">*</span>
+            </label>
+            <div class="currency-input">
+              <input v-model.number="form.premium" type="number" min="0" step="1000" 
+                     :class="{ error: submitted && !form.premium }" class="enhanced-input" />
+              <span class="currency-suffix">FCFA</span>
+            </div>
           </div>
+          <div class="form-group"></div> <!-- Espace vide pour l'alignement -->
         </div>
 
+        <!-- Actions -->
         <div class="form-actions">
-          <button class="btn btn-primary" :disabled="submitting || !canSubmit" @click="submitForm">
+          <button class="btn btn-primary btn-large" :disabled="submitting || !canSubmit" @click="submitForm">
             <span v-if="submitting" class="spinner"></span>
-            {{ submitting ? 'Traitement...' : (isEditing ? 'Mettre à jour' : 'Enregistrer le contrat') }}
+            <span class="btn-icon">{{ isEditing ? '✓' : '💾' }}</span>
+            {{ submitting ? 'Traitement en cours...' : (isEditing ? 'Mettre à jour le contrat' : 'Enregistrer le contrat') }}
           </button>
         </div>
 
         <!-- Messages -->
-        <div v-if="error" class="alert error">{{ error }}</div>
-        <div v-if="success" class="alert success">{{ success }}</div>
+        <transition name="slide-fade">
+          <div v-if="error" class="alert error">
+            <span class="alert-icon">❌</span>
+            <span>{{ error }}</span>
+            <button @click="error = ''" class="alert-close">✕</button>
+          </div>
+        </transition>
+        <transition name="slide-fade">
+          <div v-if="success" class="alert success">
+            <span class="alert-icon">✅</span>
+            <span>{{ success }}</span>
+            <button @click="success = ''" class="alert-close">✕</button>
+          </div>
+        </transition>
       </div>
     </div>
 
     <!-- Liste des contrats -->
-    <div class="card">
+    <div class="card glass-effect">
       <div class="card-header">
-        <h2>Historique des contrats <span class="badge">{{ filteredItems.length }}</span></h2>
-        <button class="btn btn-text" @click="clearFilters">Effacer les filtres</button>
+        <div class="card-title">
+          <span class="card-icon">📊</span>
+          <h2>Historique des contrats</h2>
+          <span class="badge">{{ filteredItems.length }}</span>
+        </div>
+        <button class="btn btn-ghost" @click="clearFilters">
+          <span class="btn-icon">🗑️</span>
+          Effacer les filtres
+        </button>
       </div>
 
-      <!-- Filtres -->
-      <div class="filters">
-        <input v-model="fromDate" type="date" placeholder="Date début" />
-        <input v-model="toDate" type="date" placeholder="Date fin" />
-        <input v-model.trim="searchPlate" type="text" placeholder="Rechercher une plaque..." />
-        <select v-model="statusFilter">
-          <option value="ALL">Tous les statuts</option>
-          <option value="ACTIVE">Actives</option>
-          <option value="EXPIRING">À renouveler</option>
-          <option value="EXPIRED">Expirées</option>
-        </select>
+      <!-- Filtres améliorés -->
+      <div class="filters-enhanced">
+        <div class="filter-group">
+          <span class="filter-icon">📅</span>
+          <input v-model="fromDate" type="date" placeholder="Date début" class="filter-input" />
+        </div>
+        <div class="filter-group">
+          <span class="filter-icon">📅</span>
+          <input v-model="toDate" type="date" placeholder="Date fin" class="filter-input" />
+        </div>
+        <div class="filter-group">
+          <span class="filter-icon">🔍</span>
+          <input v-model.trim="searchPlate" type="text" placeholder="Rechercher une plaque..." class="filter-input" />
+        </div>
+        <div class="filter-group">
+          <span class="filter-icon">⚡</span>
+          <select v-model="statusFilter" class="filter-select">
+            <option value="ALL">Tous les statuts</option>
+            <option value="ACTIVE">✅ Actives</option>
+            <option value="EXPIRING">⚠️ À renouveler</option>
+            <option value="EXPIRED">❌ Expirées</option>
+          </select>
+        </div>
       </div>
 
-      <!-- Table -->
-      <div class="table-container">
+      <!-- Table moderne -->
+      <div class="table-container enhanced">
         <table>
           <thead>
             <tr>
@@ -206,61 +260,82 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in paginatedItems" :key="item.id">
+            <tr v-for="item in paginatedItems" :key="item.id" class="table-row">
               <td>
-                <div class="cell-primary">{{ item.vehicle?.plate || '-' }}</div>
-                <div class="cell-secondary">
-                  {{ coverageLabel(item.insurancesType) }}
-                  <span v-if="isVehicleInRepair(item.vehicle)"> • EN RÉPARATION</span>
+                <div class="vehicle-cell">
+                  <span class="vehicle-plate">{{ item.vehicle?.plate || '-' }}</span>
+                  <span class="vehicle-type">{{ coverageLabel(item.insurancesType) }}</span>
+                  <span v-if="isVehicleInRepair(item.vehicle)" class="repair-badge">🔧 EN RÉPARATION</span>
                 </div>
               </td>
               <td>
-                <div class="cell-primary">{{ item.insurer?.name || '-' }}</div>
-                <div class="cell-secondary">N° {{ item.policyNo || '-' }}</div>
+                <div class="insurer-cell">
+                  <span class="insurer-name">{{ item.insurer?.name || '-' }}</span>
+                  <span class="policy-number">N° {{ item.policyNo || '-' }}</span>
+                </div>
               </td>
               <td>
-                <div class="cell-primary">{{ formatDate(item.startAt) }} → {{ formatDate(item.endAt) }}</div>
+                <div class="period-cell">
+                  <span class="date-start">{{ formatDate(item.startAt) }}</span>
+                  <span class="date-arrow">→</span>
+                  <span class="date-end">{{ formatDate(item.endAt) }}</span>
+                </div>
               </td>
               <td>
-                <span :class="['status', statusClass(item)]">{{ statusLabel(item) }}</span>
+                <span :class="['status-badge', statusClass(item)]">
+                  {{ statusLabel(item) }}
+                </span>
               </td>
               <td>
-                <div class="cell-primary">{{ formatFCFA(item.premium) }}</div>
+                <span class="amount">{{ formatFCFA(item.premium) }}</span>
               </td>
               <td>
-                <span :class="['badge-modifiable', canModify(item.createdAt) ? 'success' : 'error']">
+                <span :class="['modifiable-badge', canModify(item.createdAt) ? 'success' : 'error']">
+                  <span class="badge-icon">{{ canModify(item.createdAt) ? '✓' : '🔒' }}</span>
                   {{ canModify(item.createdAt) ? 'Autorisé' : 'Verrouillé' }}
                 </span>
               </td>
               <td>
-                <div class="action-buttons">
-                  <button class="btn-icon-only" :disabled="!canModify(item.createdAt)" @click="startEdit(item)">
+                <div class="action-group">
+                  <button class="action-btn edit" :disabled="!canModify(item.createdAt)" @click="startEdit(item)" title="Modifier">
                     ✏️
                   </button>
-                  <button class="btn-icon-only" :disabled="!canModify(item.createdAt)" @click="deleteItem(item)">
+                  <button class="action-btn delete" :disabled="!canModify(item.createdAt)" @click="deleteItem(item)" title="Supprimer">
                     🗑️
                   </button>
                 </div>
               </td>
             </tr>
             <tr v-if="!filteredItems.length">
-              <td colspan="7" class="empty">Aucun contrat trouvé</td>
+              <td colspan="7" class="empty-state">
+                <div class="empty-content">
+                  <span class="empty-icon">📭</span>
+                  <h3>Aucun contrat trouvé</h3>
+                  <p>Essayez de modifier vos filtres ou créez un nouveau contrat</p>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Pagination -->
-      <div class="pagination">
-        <span class="page-info">Page {{ currentPage }} / {{ totalPages }}</span>
+      <!-- Pagination améliorée -->
+      <div class="pagination-enhanced">
+        <span class="page-info">
+          Page <strong>{{ currentPage }}</strong> sur <strong>{{ totalPages }}</strong>
+        </span>
         <div class="page-buttons">
-          <button :disabled="currentPage === 1" @click="currentPage--">←</button>
-          <button :disabled="currentPage === totalPages" @click="currentPage++">→</button>
+          <button :disabled="currentPage === 1" @click="currentPage--" class="page-btn">
+            ←
+          </button>
+          <button :disabled="currentPage === totalPages" @click="currentPage++" class="page-btn">
+            →
+          </button>
         </div>
       </div>
     </div>
   </div>
-</template>
+</template> 
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
@@ -340,13 +415,6 @@ const formatFCFA = (value) => {
   return new Intl.NumberFormat("fr-FR").format(num) + " FCFA";
 };
 
-const compactAmount = (amount) => {
-  const n = Number(amount) || 0;
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return Math.round(n / 1_000) + "k";
-  return n.toString();
-};
-
 const coverageLabel = (type) => {
   const labels = {
     TIERS: "Tiers",
@@ -391,11 +459,19 @@ const calculateEndDate = () => {
   }
   
   const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+  
   const targetDay = Math.min(day, lastDay);
   
-  const end = new Date(targetYear, targetMonth, targetDay, 12, 0, 0);
+  const theoreticalEnd = new Date(targetYear, targetMonth, targetDay, 12, 0, 0);
+  
+  const end = new Date(theoreticalEnd);
+  end.setDate(end.getDate() - 1);
+  
   form.endAt = formatDateInputLocal(end);
 };
+
+
+
 
 // ==================== FORMULAIRE ====================
 const form = reactive({
@@ -420,15 +496,6 @@ const canSubmit = computed(() => {
          form.premium > 0 &&
          isVehicleInService(selectedVehicle.value);
 });
-
-// ==================== KPI ====================
-const activePolicies = computed(() => items.value.filter(i => daysDiff(i.endAt) >= 0).length);
-const expiringSoon = computed(() => items.value.filter(i => {
-  const d = daysDiff(i.endAt);
-  return d >= 0 && d <= 30;
-}).length);
-const expiredPolicies = computed(() => items.value.filter(i => daysDiff(i.endAt) < 0).length);
-const totalPremium = computed(() => items.value.reduce((acc, i) => acc + (Number(i.premium) || 0), 0));
 
 // ==================== FILTRES ====================
 const filteredItems = computed(() => {
@@ -696,6 +763,16 @@ const loadData = async () => {
   }
 };
 
+// Date du jour formatée (si pas déjà présente)
+const today = computed(() => {
+  return new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+});
+
 // ==================== INIT ====================
 onMounted(() => {
   calculateEndDate();
@@ -712,35 +789,149 @@ watch(() => form.durationUnit, calculateEndDate);
 </script>
 
 <style scoped>
+/* ==================== VARIABLES ==================== */
 .insurance {
+  /* Variables: `:root` ne fonctionne pas bien en `scoped` (l'élément html n'a pas l'attribut scope). */
+  --primary: #4361ee;
+  --primary-dark: #3a56d4;
+  --primary-light: #4895ef;
+  --secondary: #3f37c9;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --dark: #1e1b4b;
+  --light: #f8fafc;
+  --gray: #64748b;
+  --gray-light: #e2e8f0;
+  --gray-dark: #475569;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  --shadow-hover: 0 20px 60px rgba(67, 97, 238, 0.12);
+  --border-radius-sm: 8px;
+  --border-radius-md: 12px;
+  --border-radius-lg: 16px;
+  --border-radius-xl: 24px;
+  --border-radius-pill: 9999px;
+  --border-width: 2px;
+  --border-color-light: #e2e8f0;
+  --border-color-default: #cbd5e1;
+  --border-color-focus: #4361ee;
+  --border-color-success: #10b981;
+  --border-color-warning: #f59e0b;
+  --border-color-error: #ef4444;
+  --shadow-focus: 0 0 0 4px rgba(67, 97, 238, 0.15);
+  --shadow-success: 0 0 0 4px rgba(16, 185, 129, 0.15);
+  --shadow-error: 0 0 0 4px rgba(239, 68, 68, 0.15);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
   max-width: 1400px;
   margin: 0 auto;
   padding: 24px;
-  background: #f8fafc;
   min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #1e293b;
+  color: #0f172a;
+  background:
+    radial-gradient(1200px 600px at 8% -10%, rgba(67, 97, 238, 0.14), transparent 60%),
+    radial-gradient(900px 540px at 92% 0%, rgba(247, 37, 133, 0.10), transparent 55%),
+    linear-gradient(180deg, #f8fafc 0%, #f3f6ff 100%);
 }
 
-/* ==================== HEADER ==================== */
+/* ==================== GLASS EFFECT ==================== */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: var(--shadow);
+}
+
+@supports ((backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px))) {
+  .glass-effect {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.82);
+  }
+}
+
+/* ==================== HEADER AMÉLIORÉ ==================== */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  padding: 20px 30px;
+  margin-bottom: 30px;
+  border-radius: var(--border-radius-lg);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid transparent;
+  isolation: isolate;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.5), transparent);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  animation: rotate 30s linear infinite;
+  z-index: 0;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.header-left,
+.header-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.title-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.header-icon {
+  font-size: 32px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
 }
 
 .header-left h1 {
   font-size: 28px;
   font-weight: 600;
-  color: #0f172a;
-  margin: 0 0 4px;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
-  color: #64748b;
+  opacity: 0.9;
   margin: 0;
+}
+
+.date-icon {
+  font-size: 16px;
 }
 
 .header-actions {
@@ -748,165 +939,84 @@ watch(() => form.durationUnit, calculateEndDate);
   gap: 12px;
 }
 
-/* ==================== BOUTONS ==================== */
-.btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-  border: none;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.btn-outline {
-  background: white;
-  border-color: #e2e8f0;
-  color: #475569;
-}
-
-.btn-outline:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-.btn-text {
-  background: transparent;
-  border: none;
-  color: #64748b;
-}
-
-.btn-text:hover:not(:disabled) {
-  background: #f1f5f9;
-  color: #334155;
-}
-
-.btn-icon {
-  font-size: 16px;
-}
-
-.btn-icon-only {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid #e2e8f0;
-  background: white;
-  border-radius: 6px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-icon-only:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #94a3b8;
-}
-
-.btn-icon-only:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* ==================== KPI ==================== */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
-.kpi-card {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  gap: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.kpi-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-}
-
-.kpi-icon.blue { background: #eff6ff; color: #2563eb; }
-.kpi-icon.indigo { background: #eef2ff; color: #4f46e5; }
-.kpi-icon.orange { background: #fff7ed; color: #ea580c; }
-.kpi-icon.red { background: #fef2f2; color: #dc2626; }
-
-.kpi-content {
-  flex: 1;
-}
-
-.kpi-label {
-  display: block;
-  font-size: 13px;
-  color: #64748b;
-  margin-bottom: 4px;
-}
-
-.kpi-value {
-  display: block;
-  font-size: 24px;
-  font-weight: 600;
-  color: #0f172a;
-  line-height: 1.2;
-  margin-bottom: 4px;
-}
-
-.kpi-trend {
-  font-size: 12px;
-  color: #94a3b8;
-}
-
+/* ==================== KPI AMÉLIORÉS ==================== */
 /* ==================== CARTES ==================== */
 .card {
   background: white;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border-radius: var(--border-radius-lg);
+  padding: 30px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  transition: var(--transition);
+  border: 2px solid transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--border-radius-lg);
+  padding: 2px;
+  background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.card:hover::before {
+  opacity: 1;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+}
+
+.editing-card {
+  border: 2px solid transparent;
+  background: linear-gradient(white, white) padding-box,
+              linear-gradient(135deg, var(--warning), #b5179e) border-box;
+  animation: borderPulse 2s infinite;
+}
+
+@keyframes borderPulse {
+  0% { box-shadow: 0 0 0 0 rgba(247, 37, 133, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(247, 37, 133, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(247, 37, 133, 0); }
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 30px;
 }
 
-.card-header h2 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #0f172a;
-  margin: 0;
+.card-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+}
+
+.card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.card-title h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--dark);
+  margin: 0;
 }
 
 .badge {
@@ -916,6 +1026,137 @@ watch(() => form.durationUnit, calculateEndDate);
   border-radius: 20px;
   font-size: 13px;
   font-weight: 500;
+  border: 1px solid var(--border-color-light);
+}
+
+/* ==================== BOUTONS ==================== */
+.btn {
+  padding: 10px 20px;
+  border-radius: var(--border-radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s;
+}
+
+.btn:hover::before {
+  width: 200px;
+  height: 200px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(67, 97, 238, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(67, 97, 238, 0.4);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--border-color-light);
+  color: #475569;
+}
+
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.btn-text {
+  background: transparent;
+  border: 2px solid transparent;
+  color: #64748b;
+}
+
+.btn-text:hover:not(:disabled) {
+  border-color: var(--border-color-light);
+  background: #f8fafc;
+  color: #334155;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 2px solid transparent;
+  color: var(--gray);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--border-color-light);
+  background: #f8fafc;
+  color: var(--dark);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, var(--success), #059669);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-icon {
+  font-size: 16px;
+}
+
+.btn-icon-only {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 2px solid var(--border-color-light);
+  background: white;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: var(--transition);
+}
+
+.btn-icon-only:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: #eef2ff;
+  color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(67, 97, 238, 0.2);
+}
+
+.btn-icon-only:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--border-color-light);
+  background: #f8fafc;
 }
 
 /* ==================== FORMULAIRE ==================== */
@@ -938,45 +1179,149 @@ watch(() => form.durationUnit, calculateEndDate);
 
 .form-group label {
   font-size: 13px;
-  font-weight: 500;
-  color: #475569;
+  font-weight: 600;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .required {
-  color: #ef4444;
+  color: var(--danger);
   margin-left: 2px;
 }
 
+/* Champs améliorés */
 .form-group input,
-.form-group select {
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
+.form-group select,
+.enhanced-input {
+  height: 48px;
+  padding: 0 16px;
+  border: 2px solid var(--border-color-light);
+  border-radius: var(--border-radius-md);
+  font-size: 15px;
   background: white;
-  transition: all 0.2s;
+  transition: var(--transition);
+  width: 100%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.form-group input:hover,
+.form-group select:hover,
+.enhanced-input:hover {
+  border-color: var(--border-color-default);
+  background: #fafafa;
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.enhanced-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+  background: white;
+  transform: translateY(-1px);
+  animation: borderGlow 1.5s ease-in-out;
+}
+
+@keyframes borderGlow {
+  0% { border-color: var(--border-color-light); box-shadow: 0 0 0 0 rgba(67, 97, 238, 0.4); }
+  50% { border-color: var(--primary); box-shadow: 0 0 0 8px rgba(67, 97, 238, 0.1); }
+  100% { border-color: var(--border-color-light); box-shadow: 0 0 0 0 rgba(67, 97, 238, 0); }
 }
 
 .form-group input.error,
-.form-group select.error {
-  border-color: #ef4444;
-  background: #fef2f2;
+.form-group select.error,
+.enhanced-input.error {
+  border-color: var(--danger);
+  background: #fff5f5;
 }
 
-.form-group input.readonly {
+.form-group input.error:focus,
+.enhanced-input.error:focus {
+  box-shadow: var(--shadow-error);
+}
+
+.form-group input.success,
+.enhanced-input.success {
+  border-color: var(--success);
+  background: #f0fdf4;
+}
+
+.form-group input.success:focus,
+.enhanced-input.success:focus {
+  box-shadow: var(--shadow-success);
+}
+
+.form-group input.readonly,
+.enhanced-input.readonly {
   background: #f8fafc;
-  color: #64748b;
+  color: var(--gray);
+  border-color: var(--border-color-light);
   cursor: not-allowed;
+  opacity: 0.8;
 }
 
+/* Select amélioré */
+.select-wrapper {
+  position: relative;
+  border-radius: var(--border-radius-md);
+  background: white;
+  transition: var(--transition);
+}
+
+.select-wrapper select {
+  height: 48px;
+  padding: 0 16px;
+  border: 2px solid var(--border-color-light);
+  border-radius: var(--border-radius-md);
+  font-size: 15px;
+  width: 100%;
+  appearance: none;
+  background: white;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.select-wrapper:hover select {
+  border-color: var(--border-color-default);
+  background: #fafafa;
+}
+
+.select-wrapper select:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+  background: white;
+}
+
+.select-wrapper select.error {
+  border-color: var(--danger);
+  background: #fff5f5;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray);
+  pointer-events: none;
+  font-size: 12px;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.select-wrapper:hover .select-arrow {
+  color: var(--primary);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.select-wrapper.small select {
+  height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+/* Groupes d'input */
 .input-group {
   display: flex;
   gap: 8px;
@@ -984,6 +1329,10 @@ watch(() => form.durationUnit, calculateEndDate);
 
 .input-group input {
   flex: 1;
+}
+
+.input-group .btn {
+  height: 48px;
 }
 
 .duration-group {
@@ -995,89 +1344,202 @@ watch(() => form.durationUnit, calculateEndDate);
   width: 100px;
 }
 
-.duration-group select {
-  flex: 1;
+/* Champs avec devise */
+.currency-input {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
-.field-hint {
-  font-size: 12px;
-  padding: 6px 10px;
+.currency-input input {
+  padding-right: 80px;
+}
+
+.currency-suffix {
+  position: absolute;
+  right: 16px;
+  color: var(--gray);
+  font-weight: 500;
+  background: #f1f5f9;
+  padding: 4px 8px;
   border-radius: 6px;
-  margin-top: 2px;
+  font-size: 13px;
+  border: 1px solid var(--border-color-light);
+}
+
+/* Field hints */
+.field-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 12px 16px;
+  border-radius: var(--border-radius-md);
+  margin-top: 8px;
+  animation: slideDown 0.3s ease;
+  border: 2px solid transparent;
+  position: relative;
+  overflow: hidden;
 }
 
 .field-hint.warning {
   background: #fffbeb;
+  border-color: #fcd34d;
   color: #92400e;
-  border: 1px solid #fde68a;
 }
 
 .field-hint.success {
   background: #f0fdf4;
+  border-color: #6ee7b7;
   color: #166534;
-  border: 1px solid #bbf7d0;
+}
+
+.field-hint::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.field-hint.warning::before {
+  background: linear-gradient(135deg, var(--warning), #d97706);
+}
+
+.field-hint.success::before {
+  background: linear-gradient(135deg, var(--success), #059669);
+}
+
+.hint-icon {
+  font-size: 14px;
+}
+
+.date-hint {
+  font-size: 12px;
+  color: var(--gray);
+  margin-top: 6px;
+  display: block;
 }
 
 .form-actions {
   margin-top: 24px;
 }
 
-/* ==================== FILTRES ==================== */
-.filters {
+/* ==================== FILTRES AMÉLIORÉS ==================== */
+.filters-enhanced {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 16px;
   margin-bottom: 24px;
 }
 
-.filters input,
-.filters select {
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  background: white;
+.filter-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--border-radius-md);
+  transition: var(--transition);
 }
 
-/* ==================== TABLEAU ==================== */
+.filter-icon {
+  position: absolute;
+  left: 16px;
+  color: var(--gray);
+  font-size: 16px;
+  z-index: 1;
+  transition: color 0.2s ease;
+}
+
+.filter-input,
+.filter-select {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px 0 44px;
+  border: 2px solid var(--border-color-light);
+  border-radius: var(--border-radius-md);
+  font-size: 14px;
+  background: white;
+  transition: var(--transition);
+}
+
+.filter-input:hover,
+.filter-select:hover {
+  border-color: var(--border-color-default);
+  background: #fafafa;
+}
+
+.filter-input:focus,
+.filter-select:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+  background: white;
+  transform: translateY(-1px);
+}
+
+.filter-group:focus-within .filter-icon {
+  color: var(--primary);
+}
+
+/* ==================== TABLEAU AMÉLIORÉ ==================== */
 .table-container {
   overflow-x: auto;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border: 2px solid var(--border-color-light);
+  border-radius: var(--border-radius-lg);
   margin-bottom: 16px;
+  transition: var(--transition);
+}
+
+.table-container:hover {
+  border-color: var(--border-color-default);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.table-container.enhanced {
+  min-width: 100%;
 }
 
 table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   min-width: 1000px;
 }
 
 th {
   text-align: left;
-  padding: 16px;
-  background: #f8fafc;
+  padding: 18px 16px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
-  border-bottom: 1px solid #e2e8f0;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--border-color-light);
 }
 
 td {
   padding: 16px;
   border-bottom: 1px solid #f1f5f9;
   font-size: 14px;
+  transition: var(--transition);
 }
 
 tr:last-child td {
   border-bottom: none;
 }
 
-tbody tr:hover {
-  background: #f8fafc;
+tbody tr {
+  transition: var(--transition);
 }
 
+tbody tr:hover {
+  background: linear-gradient(135deg, #f8fafc, #ffffff);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
+}
+
+/* Cellules stylisées */
 .cell-primary {
   font-weight: 500;
   color: #0f172a;
@@ -1089,52 +1551,204 @@ tbody tr:hover {
   color: #64748b;
 }
 
+.vehicle-cell,
+.insurer-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vehicle-plate {
+  font-weight: 600;
+  color: var(--dark);
+  font-size: 15px;
+}
+
+.vehicle-type {
+  font-size: 12px;
+  color: var(--gray);
+}
+
+.repair-badge {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: #fff3cd;
+  color: #856404;
+  border-radius: 4px;
+  border: 1px solid #fde68a;
+  width: fit-content;
+}
+
+.insurer-name {
+  font-weight: 500;
+  color: var(--dark);
+}
+
+.policy-number {
+  font-size: 12px;
+  color: var(--gray);
+}
+
+.period-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.date-start,
+.date-end {
+  font-weight: 500;
+  color: var(--dark);
+}
+
+.date-arrow {
+  color: var(--gray);
+  font-size: 12px;
+}
+
+.amount {
+  font-weight: 600;
+  color: var(--primary);
+  font-size: 15px;
+}
+
 /* ==================== STATUTS ==================== */
+.status-badge,
 .status {
   display: inline-block;
-  padding: 4px 12px;
-  border-radius: 20px;
+  padding: 6px 12px;
+  border-radius: var(--border-radius-pill);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  text-align: center;
+  min-width: 100px;
+  border: 2px solid transparent;
+  transition: var(--transition);
 }
 
-.status.active {
-  background: #d1fae5;
+.status.active,
+.status-badge.active {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
   color: #065f46;
+  border-color: #34d399;
 }
 
-.status.warning {
-  background: #fef3c7;
+.status.warning,
+.status-badge.warning {
+  background: linear-gradient(135deg, #fed7aa, #fdba74);
   color: #92400e;
+  border-color: #f59e0b;
 }
 
-.status.expired {
-  background: #fee2e2;
+.status.expired,
+.status-badge.expired {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
   color: #b91c1c;
+  border-color: #ef4444;
 }
 
-.badge-modifiable {
-  display: inline-block;
+.badge-modifiable,
+.modifiable-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
-  border-radius: 20px;
+  border-radius: var(--border-radius-pill);
   font-size: 12px;
   font-weight: 500;
+  border: 2px solid transparent;
 }
 
-.badge-modifiable.success {
+.badge-modifiable.success,
+.modifiable-badge.success {
   background: #d1fae5;
   color: #065f46;
+  border-color: #34d399;
 }
 
-.badge-modifiable.error {
+.badge-modifiable.error,
+.modifiable-badge.error {
   background: #fee2e2;
   color: #b91c1c;
+  border-color: #ef4444;
+}
+
+.badge-icon {
+  font-size: 12px;
 }
 
 /* ==================== ACTIONS ==================== */
 .action-buttons {
   display: flex;
   gap: 8px;
+}
+
+.action-group {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.action-btn {
+  width: 38px;
+  height: 38px;
+  border: 2px solid var(--border-color-light);
+  border-radius: var(--border-radius-md);
+  background: white;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.action-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.action-btn:hover::before {
+  opacity: 0.1;
+}
+
+.action-btn.edit {
+  color: var(--primary);
+}
+
+.action-btn.edit:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: #eef2ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(67, 97, 238, 0.2);
+}
+
+.action-btn.delete {
+  color: var(--danger);
+}
+
+.action-btn.delete:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: #fef2f2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(239, 68, 68, 0.2);
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--border-color-light);
+  background: #f8fafc;
+  color: var(--gray);
 }
 
 /* ==================== PAGINATION ==================== */
@@ -1145,9 +1759,25 @@ tbody tr:hover {
   margin-top: 16px;
 }
 
+.pagination-enhanced {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border-radius: var(--border-radius-md);
+  border: 2px solid var(--border-color-light);
+}
+
 .page-info {
   font-size: 14px;
-  color: #64748b;
+  color: var(--gray);
+}
+
+.page-info strong {
+  color: var(--dark);
+  font-weight: 600;
 }
 
 .page-buttons {
@@ -1155,44 +1785,106 @@ tbody tr:hover {
   gap: 8px;
 }
 
-.page-buttons button {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #e2e8f0;
+.page-buttons button,
+.page-btn {
+  width: 42px;
+  height: 42px;
+  border: 2px solid var(--border-color-light);
   background: white;
-  border-radius: 6px;
+  border-radius: var(--border-radius-md);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  color: var(--dark);
 }
 
-.page-buttons button:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #94a3b8;
+.page-buttons button:hover:not(:disabled),
+.page-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: #eef2ff;
+  color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(67, 97, 238, 0.2);
 }
 
-.page-buttons button:disabled {
-  opacity: 0.5;
+.page-buttons button:disabled,
+.page-btn:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
+  border-color: var(--border-color-light);
+  background: #f8fafc;
 }
 
 /* ==================== MESSAGES ==================== */
 .alert {
-  padding: 12px 16px;
-  border-radius: 8px;
+  padding: 16px 20px;
+  border-radius: var(--border-radius-md);
   font-size: 14px;
   margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid transparent;
 }
 
 .alert.error {
-  background: #fee2e2;
+  background: #fef2f2;
+  border-color: #fecaca;
   color: #b91c1c;
-  border: 1px solid #fecaca;
 }
 
 .alert.success {
-  background: #dcfce7;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
   color: #166534;
-  border: 1px solid #bbf7d0;
+}
+
+.alert::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.alert.error::before {
+  background: linear-gradient(135deg, var(--danger), #dc2626);
+}
+
+.alert.success::before {
+  background: linear-gradient(135deg, var(--success), #059669);
+}
+
+.alert-icon {
+  font-size: 18px;
+}
+
+.alert-close {
+  margin-left: auto;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+  transition: var(--transition);
+}
+
+.alert-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.05);
+  border-color: currentColor;
 }
 
 .empty {
@@ -1202,12 +1894,67 @@ tbody tr:hover {
   font-style: italic;
 }
 
+.empty-state {
+  padding: 60px !important;
+}
+
+.empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--gray);
+}
+
+.empty-icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+.empty-content h3 {
+  font-size: 18px;
+  color: var(--dark);
+  margin: 0;
+}
+
+.empty-content p {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ==================== ANIMATIONS ==================== */
+.animate-slide {
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
 /* ==================== CHARGEMENT ==================== */
 .spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid #ffffff;
-  border-top-color: transparent;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   display: inline-block;
@@ -1218,12 +1965,38 @@ tbody tr:hover {
   to { transform: rotate(360deg); }
 }
 
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 1024px) {
-  .kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
+/* ==================== FOCUS ACCESSIBLE ==================== */
+.btn:focus-visible,
+.btn-icon-only:focus-visible,
+.action-btn:focus-visible,
+.page-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-color: var(--primary);
+}
+
+/* ==================== REDUCED MOTION ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .header::after {
+    animation: none;
   }
 
+  * {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 1200px) {
+  .filters-enhanced {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
   .filters {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1238,6 +2011,7 @@ tbody tr:hover {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
+    padding: 16px 20px;
   }
 
   .header-actions {
@@ -1248,22 +2022,72 @@ tbody tr:hover {
     flex: 1;
   }
 
-  .kpi-grid {
-    grid-template-columns: 1fr;
-  }
-
   .form-row {
     grid-template-columns: 1fr;
   }
 
-  .filters {
+  .filters,
+  .filters-enhanced {
     grid-template-columns: 1fr;
   }
 
-  .pagination {
+  .pagination,
+  .pagination-enhanced {
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
     align-items: flex-start;
+  }
+
+  .page-buttons {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .duration-group {
+    flex-wrap: wrap;
+  }
+
+  .duration-group input {
+    width: 100%;
+  }
+
+  .table-container {
+    border-radius: var(--border-radius-md);
+  }
+
+  th, td {
+    padding: 12px;
+  }
+
+  .action-group {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 20px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .btn-icon-only {
+    width: 34px;
+    height: 34px;
+  }
+
+  .action-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .page-btn {
+    width: 38px;
+    height: 38px;
   }
 }
 </style>
