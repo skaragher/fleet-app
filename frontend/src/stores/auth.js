@@ -123,7 +123,7 @@ export const useAuthStore = defineStore("auth", () => {
     setAuth(storedToken, storedUser);
 
     const tokenState = await verifyToken(storedToken);
-    if (tokenState === false) {
+    if (tokenState !== true) {
       clearAuth();
       return false;
     }
