@@ -92,16 +92,9 @@ app.options('*', cors(corsOptions));
 
 // Middlewares de sécurité
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-  crossOriginEmbedderPolicy: false, // Important pour certaines API
+  contentSecurityPolicy: false,          // Géré par Nginx si nécessaire
+  hsts: false,                           // Pas de HTTPS → pas de HSTS
+  crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
 
