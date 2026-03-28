@@ -466,8 +466,6 @@ const assignedStation = ref(null);
 const topbarAvatarLoadError = ref(false);
 const companyLogoLoadError = ref(false);
 
-const getApiBaseUrl = () =>
-  (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "");
 
 const buildInitialAvatarDataUrl = (name) => {
   const initials = (name || "U")
@@ -485,19 +483,27 @@ const buildInitialAvatarDataUrl = (name) => {
 const resolveAvatarUrl = (user) => {
   const src = user?.avatarUrl;
   if (!src) return buildInitialAvatarDataUrl(user?.name);
-  if (String(src).startsWith("http")) return src;
-  if (String(src).startsWith("/uploads/avatars/")) {
-    const filename = String(src).split("/").pop();
-    return `${getApiBaseUrl()}/api/auth/avatar/${filename}`;
+  // Si l'URL pointe sur localhost (dev), extraire le chemin et utiliser URL relative
+  if (String(src).match(/^https?:\/\/localhost(:\d+)?/)) {
+    const path = String(src).replace(/^https?:\/\/localhost(:\d+)?/, "");
+    return path;
   }
-  return `${getApiBaseUrl()}${src}`;
+  if (String(src).startsWith("http")) return src;
+  if (String(src).startsWith("/uploads/avatars/")) return src;
+  return `/${String(src).replace(/^\/+/, "")}`;
 };
 
 const resolveCompanyLogoUrl = (logoUrl) => {
   if (!logoUrl) return "";
-  if (String(logoUrl).startsWith("http") || String(logoUrl).startsWith("data:")) return logoUrl;
-  if (String(logoUrl).startsWith("/")) return `${getApiBaseUrl()}${logoUrl}`;
-  return `${getApiBaseUrl()}/${String(logoUrl).replace(/^\/+/, "")}`;
+  if (String(logoUrl).startsWith("data:")) return logoUrl;
+  // Si l'URL pointe sur localhost (dev), extraire le chemin et utiliser URL relative
+  if (String(logoUrl).match(/^https?:\/\/localhost(:\d+)?/)) {
+    const path = String(logoUrl).replace(/^https?:\/\/localhost(:\d+)?/, "");
+    return path;
+  }
+  if (String(logoUrl).startsWith("http")) return logoUrl;
+  if (String(logoUrl).startsWith("/")) return logoUrl;
+  return `/${String(logoUrl).replace(/^\/+/, "")}`;
 };
 
 const userAvatarUrl = computed(() => resolveAvatarUrl(auth.user));
