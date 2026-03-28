@@ -1,1 +1,0 @@
-import{_ as c,c as a,b as s,l as o}from"./index-DS7wNXxa.js";const r={},t={class:"placeholder-page"};function n(l,e){return o(),a("section",t,[...e[0]||(e[0]=[s("h1",null,"Acces refuse",-1),s("p",null,"Vous n'avez pas les permissions necessaires pour acceder a cette page.",-1)])])}const _=c(r,[["render",n],["__scopeId","data-v-8942959c"]]);export{_ as default};
