@@ -18,6 +18,8 @@ const Reports = () => import("../pages/Reports.vue");
 const Profile = () => import("../pages/Profile.vue");
 const Settings = () => import("../pages/Settings.vue");
 const AdminUsers = () => import("../pages/AdminUsers.vue");
+const FuelReports = () => import("../pages/FuelReports.vue");
+const ManagementReports = () => import("../pages/ManagementReports.vue");
 const Unauthorized = () => import("../pages/Unauthorized.vue");
 
 // Routes
@@ -32,10 +34,12 @@ const routes = [
   { path: "/stations/:id", component: Stations, name: "StationDetails", meta: { requiresAuth: true } },
   { path: "/fuel/supplies", component: Supplies, name: "Supplies", meta: { requiresAuth: true } },
   { path: "/fuel/dispenses", component: Dispenses, name: "Dispenses", meta: { requiresAuth: true } },
+  { path: "/fuel/reports", component: FuelReports, name: "FuelReports", meta: { requiresAuth: true } },
   { path: "/maintenance", component: Maintenance, name: "Maintenance", meta: { requiresAuth: true } },
   { path: "/insurance", component: Insurance, name: "Insurance", meta: { requiresAuth: true } },
   { path: "/inspections", component: Inspections, name: "Inspections", meta: { requiresAuth: true } },
   { path: "/reports", component: Reports, name: "Reports", meta: { requiresAuth: true } },
+  { path: "/management-reports", component: ManagementReports, name: "ManagementReports", meta: { requiresAuth: true } },
   { path: "/profile", component: Profile, name: "Profile", meta: { requiresAuth: true } },
   { path: "/settings", component: Settings, name: "Settings", meta: { requiresAuth: true } },
   { path: "/admin/users", component: AdminUsers, name: "AdminUsers", meta: { requiresAuth: true } },
