@@ -1,4 +1,6 @@
 <template>
+  <SessionTimeoutModal :show="warning" @stay="stayConnected" @logout="sessionLogout" />
+
   <div class="layout" :class="{ 'sidebar-open': isMenuOpen, 'sidebar-collapsed': auth.token && !isMenuOpen }">
     <!-- Overlay : voile sombre pour fermer le menu sur mobile -->
     <div v-if="isMenuOpen" class="sidebar-overlay" @click="closeMenu"></div>
@@ -442,24 +444,27 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
-import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import { ref, computed, onMounted, watch } from "vue";
+import { RouterLink, RouterView, useRoute } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import { useCompanyStore } from "./stores/company";
 import api from "./services/api";
+import { useSessionTimeout } from '@/composables/useSessionTimeout'
+import SessionTimeoutModal from '@/components/SessionTimeoutModal.vue'
+
+const { warning, stayConnected, logout: sessionLogout } = useSessionTimeout({
+  timeoutMs: 30 * 60 * 1000,  // 30 minutes d'inactivité
+  warningMs: 60 * 1000,        // avertissement 1 minute avant
+})
 
 const auth = useAuthStore();
 const company = useCompanyStore();
 const route = useRoute();
-const router = useRouter();
 const isMenuOpen = ref(false);
 const assignedVehicle = ref(null);
 const assignedStation = ref(null);
 const topbarAvatarLoadError = ref(false);
 const companyLogoLoadError = ref(false);
-const inactivityTimer = ref(null);
-const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
-const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll", "touchstart"];
 
 const getApiBaseUrl = () =>
   (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "");
@@ -529,61 +534,6 @@ watch(
   async (token) => {
     if (token) {
       await company.loadFromServer();
-    }
-  },
-  { immediate: true }
-);
-
-const clearInactivityTimer = () => {
-  if (inactivityTimer.value) {
-    clearTimeout(inactivityTimer.value);
-    inactivityTimer.value = null;
-  }
-};
-
-const handleInactivityTimeout = async () => {
-  if (!auth.token) return;
-  const currentPath = route.fullPath || "/";
-  const safeRedirect = currentPath.startsWith("/") ? currentPath : "/";
-  sessionStorage.setItem("post_login_redirect", safeRedirect);
-  auth.clearAuth();
-  await router.push({
-    name: "Login",
-    query: { reason: "inactive", redirect: safeRedirect },
-  });
-};
-
-const resetInactivityTimer = () => {
-  if (!auth.token) return;
-  clearInactivityTimer();
-  inactivityTimer.value = setTimeout(handleInactivityTimeout, INACTIVITY_TIMEOUT_MS);
-};
-
-const handleUserActivity = () => {
-  resetInactivityTimer();
-};
-
-const attachActivityListeners = () => {
-  ACTIVITY_EVENTS.forEach((eventName) => {
-    window.addEventListener(eventName, handleUserActivity, { passive: true });
-  });
-};
-
-const detachActivityListeners = () => {
-  ACTIVITY_EVENTS.forEach((eventName) => {
-    window.removeEventListener(eventName, handleUserActivity);
-  });
-};
-
-watch(
-  () => auth.token,
-  (token) => {
-    if (token) {
-      attachActivityListeners();
-      resetInactivityTimer();
-    } else {
-      clearInactivityTimer();
-      detachActivityListeners();
     }
   },
   { immediate: true }
@@ -729,10 +679,6 @@ onMounted(async () => {
   }
 });
 
-onBeforeUnmount(() => {
-  clearInactivityTimer();
-  detachActivityListeners();
-});
 </script>
 
 <style scoped>

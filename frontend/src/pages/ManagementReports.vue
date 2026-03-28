@@ -635,7 +635,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
 import { useAuthStore } from "../stores/auth";
-import { useCompanyStore } from "../stores/company";
+import { useCompanyStore } from "../stores/company.js";
 import api from "../services/api";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -764,7 +764,12 @@ const error   = ref(null);
 const data    = ref({});
 
 // ── Infos entreprise & utilisateur ────────────────────────────
-const companyName    = computed(() => companyStore.settings?.companyName || 'FLEETENERGY');
+
+const getApiBase = () => (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '');
+const companyFooterLeft = computed(() => company.displayFooter?.left || companyName.value);
+
+
+const companyName    = computed(() => companyStore.settings?.name || 'FLEETENERGY');
 const companyLogoUrl = computed(() => {
   const url = companyStore.settings?.logoUrl;
   if (!url) return '';
