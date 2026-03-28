@@ -103,7 +103,7 @@
             </thead>
             <tbody>
               <tr v-for="it in paginatedItems" :key="it.id">
-                <td>{{ it.dueAt ? new Date(it.dueAt).toLocaleDateString() : '—' }}</td>
+                <td>{{ it.dueAt ? new Date(it.dueAt).toLocaleDateString() : '-' }}</td>
                 <td><strong>{{ plate(it.vehicleId) }}</strong></td>
                 <td>
                   <span class="type-tag">{{ it.maintenanceType }}</span><br/>
@@ -158,7 +158,7 @@ const selectedVehicle = computed(() => vehicles.value.find(v => v.id === form.va
 const totalPages = computed(() => Math.ceil(items.value.length / itemsPerPage) || 1);
 const paginatedItems = computed(() => items.value.slice((currentPage.value - 1) * itemsPerPage, currentPage.value * itemsPerPage));
 
-const plate = (id) => vehicles.value.find(v => v.id === id)?.plate || "—";
+const plate = (id) => vehicles.value.find(v => v.id === id)?.plate || "-";
 
 async function load() {
   try {

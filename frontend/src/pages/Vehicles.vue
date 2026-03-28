@@ -12,7 +12,7 @@
         </div>
         <div class="mobile-driver-line">
           <span>Modèle</span>
-          <strong>{{ driverVehicle.make || "—" }} {{ driverVehicle.model || "" }}</strong>
+          <strong>{{ driverVehicle.make || "-" }} {{ driverVehicle.model || "" }}</strong>
         </div>
         <div class="mobile-driver-line">
           <span>Kilométrage</span>
@@ -20,7 +20,7 @@
         </div>
         <div class="mobile-driver-line">
           <span>Statut</span>
-          <strong>{{ String(driverVehicle.status || "").replaceAll("_", " ") || "—" }}</strong>
+          <strong>{{ String(driverVehicle.status || "").replaceAll("_", " ") || "-" }}</strong>
         </div>
       </div>
 
@@ -196,8 +196,8 @@
           <tbody>
             <tr v-for="h in vehicleDriverHistory" :key="h.id">
               <td>
-                <div class="primary-td">{{ h.user?.name || h.userName || "—" }}</div>
-                <div class="secondary-td">{{ h.user?.email || h.userEmail || "—" }}</div>
+                <div class="primary-td">{{ h.user?.name || h.userName || "-" }}</div>
+                <div class="secondary-td">{{ h.user?.email || h.userEmail || "-" }}</div>
               </td>
               <td>{{ formatDateTime(h.assignedAt) }}</td>
               <td>{{ h.unassignedAt ? formatDateTime(h.unassignedAt) : "En cours" }}</td>
@@ -328,9 +328,9 @@ async function remove(id) {
 }
 
 const formatDateTime = (value) => {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString("fr-FR");
 };
 
@@ -392,7 +392,7 @@ const toInputDate = (value) => {
   return d.toISOString().slice(0, 10);
 };
 
-const formatDate = (value) => (value ? new Date(value).toLocaleDateString("fr-FR") : "—");
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString("fr-FR") : "-");
 const handleResize = () => { viewportWidth.value = window.innerWidth; };
 
 onMounted(() => {

@@ -382,7 +382,7 @@
           <span class="summary-value">{{ comparisonData.summary.critiques }}</span>
         </div>
         <div class="summary-card summary-card--warning">
-          <span class="summary-label">Attention (10–25%)</span>
+          <span class="summary-label">Attention (10-25%)</span>
           <span class="summary-value">{{ comparisonData.summary.attentions }}</span>
         </div>
         <div class="summary-card summary-card--success">
@@ -440,7 +440,7 @@
 
       <div class="legend">
         <span class="legend-item"><span class="status-badge status-critique">Critique</span> Surconsommation &gt;25% - risque fraude/fuite</span>
-        <span class="legend-item"><span class="status-badge status-attention">Attention</span> Surconsommation 10–25% - à surveiller</span>
+        <span class="legend-item"><span class="status-badge status-attention">Attention</span> Surconsommation 10-25% - à surveiller</span>
         <span class="legend-item"><span class="status-badge status-ok">Normal</span> Dans la norme (±10%)</span>
         <span class="legend-item"><span class="status-badge status-economie">Économique</span> Sous la norme de plus de 10%</span>
       </div>

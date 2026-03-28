@@ -189,9 +189,9 @@
                 <tbody>
                   <tr v-for="s in supplies.slice(0, 10)" :key="s.id">
                     <td>{{ formatDate(s.deliveredAt) }}</td>
-                    <td>{{ s.station?.name || "—" }}</td>
-                    <td>{{ s.tank?.name || s.tank?.fuelType || "—" }}</td>
-                    <td>{{ s.supplier || "—" }}</td>
+                    <td>{{ s.station?.name || "-" }}</td>
+                    <td>{{ s.tank?.name || s.tank?.fuelType || "-" }}</td>
+                    <td>{{ s.supplier || "-" }}</td>
                     <td>{{ (s.deliveredL || 0).toLocaleString() }} L</td>
                   </tr>
                   <tr v-if="!supplies.length">
@@ -218,9 +218,9 @@
                 <tbody>
                   <tr v-for="d in dispenses.slice(0, 10)" :key="d.id">
                     <td>{{ formatDate(d.dispensedAt) }}</td>
-                    <td>{{ d.station?.name || "—" }}</td>
-                    <td>{{ d.vehicle?.plate || "—" }}</td>
-                    <td>{{ d.tank?.name || d.tank?.fuelType || "—" }}</td>
+                    <td>{{ d.station?.name || "-" }}</td>
+                    <td>{{ d.vehicle?.plate || "-" }}</td>
+                    <td>{{ d.tank?.name || d.tank?.fuelType || "-" }}</td>
                     <td>{{ (d.liters || 0).toLocaleString() }} L</td>
                   </tr>
                   <tr v-if="!dispenses.length">
@@ -247,8 +247,8 @@
               </thead>
               <tbody>
                 <tr v-for="row in stationRuptureAlerts" :key="row.tank.id" :class="row.estimate.daysLeft <= 7 ? 'row-urgent' : 'row-warning'">
-                  <td>{{ row.tank.station?.name || "—" }}</td>
-                  <td>{{ row.tank.name || row.tank.fuelType || "—" }}</td>
+                  <td>{{ row.tank.station?.name || "-" }}</td>
+                  <td>{{ row.tank.name || row.tank.fuelType || "-" }}</td>
                   <td>{{ (row.tank.currentL || 0).toLocaleString() }} L</td>
                   <td>{{ (row.tank.lowAlertL || 0).toLocaleString() }} L</td>
                   <td>Dans {{ row.estimate.daysLeft }}j ({{ formatDate(row.estimate.date) }})</td>
@@ -404,7 +404,7 @@
                       </div>
                     </div>
                   </td>
-                  <td>{{ truncateText(i.center, 20) || '—' }}</td>
+                  <td>{{ truncateText(i.center, 20) || '-' }}</td>
                   <td>
                     <span :class="['status-pill', getInspectionStatus(i)]">
                       {{ getInspectionStatusLabel(i) }}
@@ -440,7 +440,7 @@
                       <div class="vehicle-icon">🛡️</div>
                       <div>
                         <strong>{{ ins.vehicle?.plate || 'N/A' }}</strong>
-                        <div class="vehicle-model">{{ ins.vehicle?.model || '—' }}</div>
+                        <div class="vehicle-model">{{ ins.vehicle?.model || '-' }}</div>
                       </div>
                     </div>
                   </td>
@@ -451,7 +451,7 @@
                   </td>
                   <td>
                     <span class="policy-number" :title="ins.policyNo">
-                      {{ ins.policyNo ? truncateText(ins.policyNo, 12) : '—' }}
+                      {{ ins.policyNo ? truncateText(ins.policyNo, 12) : '-' }}
                     </span>
                   </td>
                   <td>
@@ -538,13 +538,13 @@
                   <span v-if="v.history && v.history.length > 0" class="last-refuel">
                     {{ formatDate(v.history[0]?.date) }}
                   </span>
-                  <span v-else class="no-refuel">—</span>
+                  <span v-else class="no-refuel">-</span>
                 </td>
                 <td>
                   <span v-if="v.history && v.history.length > 0" class="last-quantity">
                     {{ v.history[0]?.liters }} L
                   </span>
-                  <span v-else class="no-refuel">—</span>
+                  <span v-else class="no-refuel">-</span>
                 </td>
               </tr>
             </tbody>
@@ -809,7 +809,7 @@ const getDaysDiff = (date) => {
 };
 
 const formatDate = (dateString) => {
-  if (!dateString) return '—';
+  if (!dateString) return '-';
   return new Date(dateString).toLocaleDateString('fr-FR', {
     day: '2-digit',
     month: '2-digit',
@@ -818,7 +818,7 @@ const formatDate = (dateString) => {
 };
 
 const truncateText = (text, maxLength) => {
-  if (!text) return '—';
+  if (!text) return '-';
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';
 };

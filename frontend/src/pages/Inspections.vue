@@ -245,7 +245,7 @@
                   <div v-if="getEffectiveNextVisitDate(item)" class="next-date-cell">
                     <span class="next-date">{{ formatDate(getEffectiveNextVisitDate(item)) }}</span>
                   </div>
-                  <span v-else class="no-date">—</span>
+                  <span v-else class="no-date">-</span>
                 </td>
 
                 <!-- Temps restant -->
@@ -259,7 +259,7 @@
                       {{ getTimeRemainingDetail(getEffectiveNextVisitDate(item)) }}
                     </div>
                   </div>
-                  <span v-else class="no-date">—</span>
+                  <span v-else class="no-date">-</span>
                 </td>
 
                 <!-- Coût -->
@@ -384,7 +384,7 @@ const minDate = (() => {
 
 // ==================== FONCTIONS UTILITAIRES ====================
 const formatDate = (dateString) => {
-  if (!dateString) return '—';
+  if (!dateString) return '-';
   return new Date(dateString).toLocaleDateString('fr-FR', {
     day: '2-digit',
     month: '2-digit',
@@ -404,7 +404,7 @@ const getVehicleById = (id) => vehicles.value.find(v => String(v.id) === String(
 
 const getVehiclePlate = (id) => {
   const v = getVehicleById(id);
-  return v?.plate || "—";
+  return v?.plate || "-";
 };
 
 const isVehicleOutOfService = (vehicle) => {

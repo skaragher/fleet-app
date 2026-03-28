@@ -122,7 +122,7 @@
           <tr v-for="u in users" :key="u.id">
             <td>{{ u.name }}</td>
             <td>{{ u.email }}</td>
-            <td>{{ u.licenseNo || "—" }}</td>
+            <td>{{ u.licenseNo || "-" }}</td>
             <td>{{ u.role }}</td>
             <td>{{ formatAdditionalRoles(u.roles, u.role) }}</td>
             <td>
@@ -130,8 +130,8 @@
                 {{ u.isActive === false ? "Désactivé" : "Actif" }}
               </span>
             </td>
-            <td>{{ u.assignedVehicle?.plate || "—" }}</td>
-            <td>{{ stationNames(u.assignedStationIds).join(", ") || "—" }}</td>
+            <td>{{ u.assignedVehicle?.plate || "-" }}</td>
+            <td>{{ stationNames(u.assignedStationIds).join(", ") || "-" }}</td>
             <td>
               <div class="table-actions">
                 <button class="btn small" @click="startEdit(u)">Modifier</button>
@@ -187,7 +187,7 @@
               </span>
             </td>
             <td>{{ formatDateTime(u.lastLoginAt) }}</td>
-            <td>{{ u.ipAddress || "—" }}</td>
+            <td>{{ u.ipAddress || "-" }}</td>
           </tr>
           <tr v-if="!connectedUsers.length && !loadingConnected">
             <td colspan="6" class="history-empty">Aucune connexion enregistrée.</td>
@@ -220,7 +220,7 @@
         </thead>
         <tbody>
           <tr v-for="h in vehicleHistory" :key="h.id">
-            <td>{{ h.vehicle?.plate || "—" }} - {{ h.vehicle?.model || "N/A" }}</td>
+            <td>{{ h.vehicle?.plate || "-" }} - {{ h.vehicle?.model || "N/A" }}</td>
             <td>{{ formatDateTime(h.assignedAt) }}</td>
             <td>{{ h.unassignedAt ? formatDateTime(h.unassignedAt) : "En cours" }}</td>
             <td>{{ h.assignedBy?.name || "Système" }}</td>
@@ -320,7 +320,7 @@ const resetForm = () => {
 
 const formatAdditionalRoles = (roles = [], primaryRole = null) => {
   const filtered = Array.from(new Set((roles || []).filter((r) => r && r !== primaryRole)));
-  return filtered.length ? filtered.join(", ") : "—";
+  return filtered.length ? filtered.join(", ") : "-";
 };
 
 const toggleAdditionalRole = (role) => {
@@ -505,9 +505,9 @@ const removeUser = async (u) => {
 };
 
 const formatDateTime = (value) => {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString("fr-FR");
 };
 
