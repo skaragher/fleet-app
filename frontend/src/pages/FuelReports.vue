@@ -396,7 +396,7 @@
       </div>
 
       <div class="norm-info">
-        Norme appliquée : <strong>{{ comparisonData.normL100km }} L/100km</strong>
+        Norme par catégorie — les véhicules sans catégorie utilisent <strong>{{ comparisonData.normL100km }} L/100km</strong>
       </div>
 
       <div class="section-title">Analyse des écarts par véhicule</div>
@@ -405,9 +405,10 @@
           <thead>
             <tr>
               <th>Véhicule</th>
-              <th>Type</th>
+              <th>Catégorie</th>
+              <th class="num">Norme (L/100km)</th>
               <th class="num">Km parcourus</th>
-              <th class="num">Volume consommé (L)</th>
+              <th class="num">Volume réel (L)</th>
               <th class="num">Volume norme (L)</th>
               <th class="num">Écart (L)</th>
               <th class="num">Écart (%)</th>
@@ -420,16 +421,16 @@
                 <strong>{{ v.plate }}</strong>
                 <span class="vehicle-sub" v-if="v.make || v.model">{{ [v.make, v.model].filter(Boolean).join(' ') }}</span>
               </td>
-              <td><span class="fuel-badge">{{ v.fuelType }}</span></td>
+              <td>
+                <span v-if="v.category" class="category-badge">{{ CATEGORY_LABELS[v.category] }}</span>
+                <span v-else class="no-category">—</span>
+              </td>
+              <td class="num"><strong>{{ v.normRate }}</strong></td>
               <td class="num">{{ v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '-' }}</td>
               <td class="num">{{ fmt(v.totalL) }}</td>
               <td class="num">{{ v.normL !== null && v.normL !== undefined ? fmt(v.normL) : '-' }}</td>
-              <td class="num" :class="excessClass(v.excessL)">
-                {{ formatExcess(v.excessL) }}
-              </td>
-              <td class="num" :class="excessClass(v.ecartPct)">
-                {{ formatEcartPct(v.ecartPct) }}
-              </td>
+              <td class="num" :class="excessClass(v.excessL)">{{ formatExcess(v.excessL) }}</td>
+              <td class="num" :class="excessClass(v.ecartPct)">{{ formatEcartPct(v.ecartPct) }}</td>
               <td>
                 <span class="status-badge" :class="'status-' + v.status">{{ statusLabel(v.status) }}</span>
               </td>
@@ -477,6 +478,15 @@ const firstOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split
 const startDate = ref(firstOfYear);
 const endDate = ref(today);
 const norm = ref(parseFloat(localStorage.getItem('fuelNorm') || '12'));
+
+const CATEGORY_LABELS = {
+  CITADINE:     'Citadine',
+  BERLINE_SUV:  'Berline/SUV',
+  PICKUP_4X4:   'Pick-up/4x4',
+  PETIT_CAMION: 'Pt Camion',
+  POIDS_LOURD:  'Poids Lourd',
+  GROS_PORTEUR: 'Gros Porteur',
+};
 const loading = ref(false);
 const pdfExporting = ref(false);
 const error = ref('');
@@ -1317,6 +1327,18 @@ onUnmounted(() => {
 
 .bar-cell { display: flex; align-items: center; gap: 8px; }
 .bar-fill { height: 6px; background: #1d4ed8; border-radius: 3px; min-width: 4px; }
+
+.category-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+.no-category { color: #94a3b8; font-size: 0.8rem; }
 
 .fuel-badge {
   display: inline-block;

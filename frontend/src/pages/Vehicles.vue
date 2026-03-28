@@ -101,6 +101,18 @@
           </select>
         </div>
         <div class="input-group mini">
+          <label>Catégorie</label>
+          <select v-model="form.category">
+            <option :value="null">— Non définie —</option>
+            <option value="CITADINE">Citadine (7 L/100km)</option>
+            <option value="BERLINE_SUV">Berline / SUV (10 L/100km)</option>
+            <option value="PICKUP_4X4">Pick-up / 4x4 (12 L/100km)</option>
+            <option value="PETIT_CAMION">Petit camion 3-7t (18 L/100km)</option>
+            <option value="POIDS_LOURD">Poids lourd 15-20t (28 L/100km)</option>
+            <option value="GROS_PORTEUR">Gros porteur 40t (38 L/100km)</option>
+          </select>
+        </div>
+        <div class="input-group mini">
           <label>Km</label>
           <input type="number" v-model.number="form.odometerKm" />
         </div>
@@ -133,6 +145,7 @@
               <th>Véhicule</th>
               <th>Marque/Model</th>
               <th>Carburant</th>
+              <th>Catégorie</th>
               <th>Mise en circulation</th>
               <th>Kilométrage</th>
               <th>Statut</th>
@@ -147,6 +160,7 @@
               </td>
               <td>{{ v.make }} {{ v.model }}</td>
               <td><span :class="['pill-fuel', v.fuelType.toLowerCase()]">{{ v.fuelType }}</span></td>
+              <td><span v-if="v.category" class="pill-category">{{ CATEGORY_LABELS[v.category] }}</span><span v-else class="muted">—</span></td>
               <td>{{ formatDate(v.commissioningDate) }}</td>
               <td class="km-cell">{{ v.odometerKm.toLocaleString() }} km</td>
               <td>
@@ -216,6 +230,15 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import api from "../services/api";
 import { useAuthStore } from "../stores/auth";
 
+const CATEGORY_LABELS = {
+  CITADINE:     'Citadine',
+  BERLINE_SUV:  'Berline/SUV',
+  PICKUP_4X4:   'Pick-up/4x4',
+  PETIT_CAMION: 'Pt Camion',
+  POIDS_LOURD:  'Poids Lourd',
+  GROS_PORTEUR: 'Gros Porteur',
+};
+
 const items = ref([]);
 const error = ref("");
 const editingId = ref(null);
@@ -240,6 +263,7 @@ const initialForm = {
   model: "",
   commissioningDate: "",
   fuelType: "DIESEL",
+  category: null,
   chassisNumber: "",
   odometerKm: 0,
   status: "EN_SERVICE"
@@ -455,6 +479,7 @@ onUnmounted(() => {
 .pill-fuel { padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 800; }
 .pill-fuel.diesel { background: #e0f2fe; color: #0369a1; }
 .pill-fuel.super { background: #fee2e2; color: #991b1b; }
+.pill-category { padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 700; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
 .status-dot.en_service { background: #10b981; box-shadow: 0 0 5px #10b981; }

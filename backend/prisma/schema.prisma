@@ -86,6 +86,7 @@ model Vehicle {
   make              String?
   model             String?
   fuelType          FuelType
+  category          VehicleCategory?
   odometerKm        Int                 @default(0)
   status            VehicleStatus       @default(EN_SERVICE)
   createdAt         DateTime            @default(now())
@@ -269,6 +270,15 @@ enum VehicleStatus {
   EN_SERVICE
   EN_REPARATION
   HORS_SERVICE
+}
+
+enum VehicleCategory {
+  CITADINE
+  BERLINE_SUV
+  PICKUP_4X4
+  PETIT_CAMION
+  POIDS_LOURD
+  GROS_PORTEUR
 }
 
 enum InsurancesType {

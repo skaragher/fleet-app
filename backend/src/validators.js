@@ -11,7 +11,9 @@ export const vehicleSchema = z.object({
   chassisNumber: z.string().min(5),
   odometerKm: z.number().int().nonnegative().optional().default(0),
   // Synchronisé avec Enum VehicleStatus de Prisma
-  status: z.enum(["EN_SERVICE", "EN_REPARATION", "HORS_SERVICE"]).optional().default("EN_SERVICE")
+  status: z.enum(["EN_SERVICE", "EN_REPARATION", "HORS_SERVICE"]).optional().default("EN_SERVICE"),
+  // Catégorie véhicule pour calcul norme de consommation
+  category: z.enum(["CITADINE", "BERLINE_SUV", "PICKUP_4X4", "PETIT_CAMION", "POIDS_LOURD", "GROS_PORTEUR"]).optional().nullable(),
 });
 
 // ================= DRIVER =================

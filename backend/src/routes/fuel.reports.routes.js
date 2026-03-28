@@ -285,6 +285,17 @@ router.get("/consumption", auth(ALLOWED_ROLES), async (req, res, next) => {
   }
 });
 
+// Normes de consommation standard par catégorie (L/100km)
+const CATEGORY_NORMS = {
+  CITADINE:     7,
+  BERLINE_SUV:  10,
+  PICKUP_4X4:   12,
+  PETIT_CAMION: 18,
+  POIDS_LOURD:  28,
+  GROS_PORTEUR: 38,
+};
+const DEFAULT_NORM = 12;
+
 // ============================================================
 // ÉTAT 4 : COMPARATIF CONSOMMATION VS NORME (détection anomalies)
 // GET /api/fuel/reports/comparison
@@ -294,8 +305,8 @@ router.get("/comparison", auth(ALLOWED_ROLES), async (req, res, next) => {
     const startDate = req.query.startDate ? new Date(req.query.startDate) : new Date(new Date().getFullYear(), 0, 1);
     const endDate = req.query.endDate ? new Date(req.query.endDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
-    // Norme par défaut en L/100km (peut être passée en paramètre)
-    const normL100km = parseFloat(req.query.norm) || 12;
+    // Norme globale de secours si le véhicule n'a pas de catégorie
+    const fallbackNorm = parseFloat(req.query.norm) || DEFAULT_NORM;
 
     const allowedStationsV = await getAllowedStationIds(req.user);
     const whereV = { dispensedAt: { gte: startDate, lte: endDate }, vehicleId: { not: null } };
@@ -304,7 +315,7 @@ router.get("/comparison", auth(ALLOWED_ROLES), async (req, res, next) => {
     const dispenses = await prisma.fuelDispense.findMany({
       where: whereV,
       include: {
-        vehicle: { select: { id: true, plate: true, make: true, model: true, fuelType: true } },
+        vehicle: { select: { id: true, plate: true, make: true, model: true, fuelType: true, category: true } },
       },
       orderBy: [{ vehicleId: "asc" }, { dispensedAt: "asc" }],
     });
@@ -320,6 +331,7 @@ router.get("/comparison", auth(ALLOWED_ROLES), async (req, res, next) => {
           make: d.vehicle?.make || "",
           model: d.vehicle?.model || "",
           fuelType: d.vehicle?.fuelType || "-",
+          category: d.vehicle?.category || null,
           totalL: 0,
           count: 0,
           odometerFirst: d.odometerKm || 0,
@@ -333,6 +345,8 @@ router.get("/comparison", auth(ALLOWED_ROLES), async (req, res, next) => {
     }
 
     const vehicles = Object.values(vehicleMap).map((v) => {
+      // Utiliser la norme de la catégorie du véhicule, sinon la norme de secours
+      const normL100km = v.category ? (CATEGORY_NORMS[v.category] ?? fallbackNorm) : fallbackNorm;
       const kmDriven = v.odometerLast - v.odometerFirst;
       const actualRate = kmDriven > 0 ? (v.totalL / kmDriven) * 100 : null;
       const normL = kmDriven > 0 ? (normL100km / 100) * kmDriven : null;
@@ -369,7 +383,7 @@ router.get("/comparison", auth(ALLOWED_ROLES), async (req, res, next) => {
       success: true,
       data: {
         period: { startDate, endDate },
-        normL100km,
+        normL100km: fallbackNorm,
         summary: { total: vehicles.length, critiques, attentions, economies, normaux },
         vehicles,
       },
