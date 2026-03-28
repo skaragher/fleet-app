@@ -7,12 +7,12 @@ node_modules/
 .env.production
 deploy/.env.production
 
-# Build folders
+# Build folders (frontend/dist = build local Vite, pas déployé)
 dist/
 build/
 .next/
 out/
-frontend-dist/
+# frontend-dist/ → déployé via git, NE PAS ignorer
 
 # Logs
 logs/
