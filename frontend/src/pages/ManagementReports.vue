@@ -82,7 +82,7 @@
               v-for="v in vehicles"
               :key="v.id"
               :value="v.id"
-            >{{ v.plate }}{{ v.label ? ' — ' + v.label : '' }}</option>
+            >{{ v.plate }}{{ v.label ? ' - ' + v.label : '' }}</option>
           </select>
           <button
             v-if="selectedVehicleId"
@@ -242,7 +242,7 @@
                     <td>{{ r.driver }}</td>
                     <td>{{ r.station }}</td>
                     <td>{{ fmt(r.liters) }}</td>
-                    <td>{{ r.unitPrice ? fmt(r.unitPrice) : '—' }}</td>
+                    <td>{{ r.unitPrice ? fmt(r.unitPrice) : '-' }}</td>
                     <td>{{ fmtCost(r.cost) }}</td>
                   </tr>
                   <tr v-if="!data.expenses.lines?.length"><td colspan="7" class="empty">Aucune donnée</td></tr>
@@ -276,9 +276,9 @@
                   <tr v-for="r in data.assignments.userAssignments" :key="r.id">
                     <td>{{ r.userName }}</td>
                     <td><span class="badge">{{ r.userRole }}</span></td>
-                    <td>{{ r.vehicle }}<small v-if="r.vehicleLabel"> — {{ r.vehicleLabel }}</small></td>
+                    <td>{{ r.vehicle }}<small v-if="r.vehicleLabel"> - {{ r.vehicleLabel }}</small></td>
                     <td>{{ fmtDate(r.assignedAt) }}</td>
-                    <td>{{ r.unassignedAt ? fmtDate(r.unassignedAt) : '—' }}</td>
+                    <td>{{ r.unassignedAt ? fmtDate(r.unassignedAt) : '-' }}</td>
                     <td><span class="status-dot" :class="r.active ? 'green' : 'grey'">{{ r.active ? 'Actif' : 'Terminé' }}</span></td>
                   </tr>
                   <tr v-if="!data.assignments.userAssignments?.length"><td colspan="6" class="empty">Aucune affectation</td></tr>
@@ -296,9 +296,9 @@
                   <tr v-for="r in data.assignments.driverAssignments" :key="r.id">
                     <td>{{ r.driverName }}</td>
                     <td>{{ r.licenseNo }}</td>
-                    <td>{{ r.vehicle }}<small v-if="r.vehicleLabel"> — {{ r.vehicleLabel }}</small></td>
+                    <td>{{ r.vehicle }}<small v-if="r.vehicleLabel"> - {{ r.vehicleLabel }}</small></td>
                     <td>{{ fmtDate(r.startDate) }}</td>
-                    <td>{{ r.endDate ? fmtDate(r.endDate) : '—' }}</td>
+                    <td>{{ r.endDate ? fmtDate(r.endDate) : '-' }}</td>
                     <td><span class="status-dot" :class="r.active ? 'green' : 'grey'">{{ r.active ? 'Actif' : 'Terminé' }}</span></td>
                   </tr>
                   <tr v-if="!data.assignments.driverAssignments?.length"><td colspan="6" class="empty">Aucune affectation</td></tr>
@@ -352,9 +352,9 @@
                   <td>{{ fmtDate(r.date) }}</td>
                   <td>{{ r.vehicle }}<br/><small>{{ r.vehicleLabel }}</small></td>
                   <td><span class="badge">{{ r.type }}</span></td>
-                  <td>{{ r.description || '—' }}</td>
-                  <td>{{ r.odometerKm ? fmt(r.odometerKm) : '—' }}</td>
-                  <td>{{ r.cost ? fmtCost(r.cost) : '—' }}</td>
+                  <td>{{ r.description || '-' }}</td>
+                  <td>{{ r.odometerKm ? fmt(r.odometerKm) : '-' }}</td>
+                  <td>{{ r.cost ? fmtCost(r.cost) : '-' }}</td>
                 </tr>
                 <tr v-if="!data.maintenanceDone.lines?.length"><td colspan="6" class="empty">Aucun entretien réalisé</td></tr>
               </tbody>
@@ -376,9 +376,9 @@
                 <tr v-for="r in data.maintenanceUpcoming.lines" :key="r.id" :class="['row-' + r.urgency]">
                   <td>{{ r.vehicle }}<br/><small>{{ r.vehicleLabel }}</small></td>
                   <td><span class="badge">{{ r.type }}</span></td>
-                  <td>{{ r.description || '—' }}</td>
-                  <td>{{ r.dueAt ? fmtDate(r.dueAt) : '—' }}</td>
-                  <td>{{ r.daysLeft !== null ? r.daysLeft + ' j' : '—' }}</td>
+                  <td>{{ r.description || '-' }}</td>
+                  <td>{{ r.dueAt ? fmtDate(r.dueAt) : '-' }}</td>
+                  <td>{{ r.daysLeft !== null ? r.daysLeft + ' j' : '-' }}</td>
                   <td><span class="urgency-badge" :class="'urgency-' + r.urgency">{{ fmtUrgency(r.urgency) }}</span></td>
                 </tr>
                 <tr v-if="!data.maintenanceUpcoming.lines?.length"><td colspan="6" class="empty">Aucun entretien planifié</td></tr>
@@ -402,8 +402,8 @@
                   <td><span class="alert-type-icon">{{ alertTypeIcon(r.type) }}</span> {{ fmtAlertType(r.type) }}</td>
                   <td>{{ r.vehiclePlate }}<br/><small>{{ r.vehicleLabel }}</small></td>
                   <td>{{ r.label }}</td>
-                  <td>{{ r.dueDate ? fmtDate(r.dueDate) : '—' }}</td>
-                  <td>{{ r.daysLeft !== null ? r.daysLeft + ' j' : '—' }}</td>
+                  <td>{{ r.dueDate ? fmtDate(r.dueDate) : '-' }}</td>
+                  <td>{{ r.daysLeft !== null ? r.daysLeft + ' j' : '-' }}</td>
                   <td><span class="urgency-badge" :class="'urgency-' + r.status">{{ fmtUrgency(r.status) }}</span></td>
                 </tr>
                 <tr v-if="!data.maintenanceAlerts.alerts?.length"><td colspan="6" class="empty">Aucune alerte</td></tr>
@@ -461,7 +461,7 @@
                   <td>{{ fmt(r.currentL) }}</td>
                   <td>{{ fmt(r.theoreticalL) }}</td>
                   <td :class="r.ecartL < 0 ? 'text-red' : 'text-green'">{{ r.ecartL > 0 ? '+' : '' }}{{ fmt(r.ecartL) }}</td>
-                  <td :class="r.ecartPct !== null && Math.abs(r.ecartPct) > 5 ? 'text-red' : ''">{{ r.ecartPct !== null ? r.ecartPct + '%' : '—' }}</td>
+                  <td :class="r.ecartPct !== null && Math.abs(r.ecartPct) > 5 ? 'text-red' : ''">{{ r.ecartPct !== null ? r.ecartPct + '%' : '-' }}</td>
                   <td>
                     <div class="progress-bar">
                       <div class="progress-fill" :style="`width:${r.fillPct}%`" :class="r.fillPct < 20 ? 'low' : ''"></div>
@@ -515,7 +515,7 @@
                     <td>{{ r.station }}</td>
                     <td>{{ r.tank }}</td>
                     <td>{{ r.supplier }}</td>
-                    <td>{{ r.deliveryRef || '—' }}</td>
+                    <td>{{ r.deliveryRef || '-' }}</td>
                     <td>{{ fmt(r.deliveredL) }}</td>
                     <td>{{ fmtCost(r.cost) }}</td>
                   </tr>
@@ -680,7 +680,7 @@ const showVehicleFilter = computed(() =>
 const selectedVehicleLabel = computed(() => {
   if (!selectedVehicleId.value) return '';
   const v = vehicles.value.find(v => v.id === selectedVehicleId.value);
-  return v ? `${v.plate}${v.label ? ' — ' + v.label : ''}` : '';
+  return v ? `${v.plate}${v.label ? ' - ' + v.label : ''}` : '';
 });
 
 async function loadVehicles() {
@@ -714,10 +714,10 @@ async function loadVehicles() {
       return;
     }
 
-    // Normalise les champs pour le select — supporte id/vehicleId/_id et plate/licensePlate/immatriculation
+    // Normalise les champs pour le select - supporte id/vehicleId/_id et plate/licensePlate/immatriculation
     vehicles.value = raw.map(v => ({
       id:    v.id ?? v.vehicleId ?? v._id ?? '',
-      plate: v.plate ?? v.licensePlate ?? v.immatriculation ?? v.registration ?? '—',
+      plate: v.plate ?? v.licensePlate ?? v.immatriculation ?? v.registration ?? '-',
       label: v.label ?? ((v.make && v.model) ? `${String(v.make ?? '')} ${String(v.model ?? '')}`.trim() : (v.description ?? '')),
     })).filter(v => v.id && v.plate);
 
@@ -871,9 +871,9 @@ async function fetchData() {
   } catch (e) {
     const status = e?.response?.status;
     const msg    = e?.response?.data?.message || e?.response?.data?.error;
-    if (status === 403)      error.value = 'Accès refusé (403) — votre rôle ne permet pas d\'accéder à ce rapport.';
-    else if (status === 404) error.value = 'Route introuvable (404) — le backend doit être redémarré.';
-    else if (status === 401) error.value = 'Session expirée — veuillez vous reconnecter.';
+    if (status === 403)      error.value = 'Accès refusé (403) - votre rôle ne permet pas d\'accéder à ce rapport.';
+    else if (status === 404) error.value = 'Route introuvable (404) - le backend doit être redémarré.';
+    else if (status === 401) error.value = 'Session expirée - veuillez vous reconnecter.';
     else                     error.value = msg || e?.message || 'Erreur lors du chargement du rapport.';
   } finally {
     loading.value = false;
@@ -891,8 +891,8 @@ const selectedVehiclePlate = computed(() => {
 /**
  * Vérifie si un objet ligne correspond au véhicule sélectionné.
  * Stratégie :
- *  1. Comparaison par ID (vehicleId, vehicle_id, id) — exact
- *  2. Comparaison par plaque (plate, vehicle, vehiclePlate) — exact ou partiel
+ *  1. Comparaison par ID (vehicleId, vehicle_id, id) - exact
+ *  2. Comparaison par plaque (plate, vehicle, vehiclePlate) - exact ou partiel
  */
 function matchesVehicle(row) {
   if (!selectedVehicleId.value) return true;
@@ -901,11 +901,11 @@ function matchesVehicle(row) {
   const selId    = String(selectedVehicleId.value);
   const selPlate = selectedVehiclePlate.value.trim().toLowerCase();
 
-  // 1. Comparaison par ID — le plus fiable
+  // 1. Comparaison par ID - le plus fiable
   const rowId = row.vehicleId ?? row.vehicle_id ?? row.id ?? row.vehiculeId;
   if (rowId != null && String(rowId) === selId) return true;
 
-  // 2. Comparaison par plaque — fallback
+  // 2. Comparaison par plaque - fallback
   if (!selPlate) return false;
   const candidates = [row.plate, row.vehicle, row.vehiclePlate, row.vehiculeLabel, row.label];
   return candidates.some(c => c && String(c).toLowerCase().includes(selPlate));
@@ -1006,10 +1006,10 @@ onMounted(() => {
 watch(dailyDate, fetchData);
 
 // ── Helpers ───────────────────────────────────────────────────
-function fmt(n)     { return n != null ? Number(n).toLocaleString('fr-FR') : '—'; }
-function fmtCost(n) { return n != null ? Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' FCFA' : '—'; }
-function fmtDate(d) { if (!d) return '—'; try { return new Date(d).toLocaleDateString('fr-FR'); } catch { return '—'; } }
-function fmtTime(d) { if (!d) return '—'; try { return new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch { return '—'; } }
+function fmt(n)     { return n != null ? Number(n).toLocaleString('fr-FR') : '-'; }
+function fmtCost(n) { return n != null ? Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' FCFA' : '-'; }
+function fmtDate(d) { if (!d) return '-'; try { return new Date(d).toLocaleDateString('fr-FR'); } catch { return '-'; } }
+function fmtTime(d) { if (!d) return '-'; try { return new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch { return '-'; } }
 function fmtStatus(s)  { return s === 'EN_SERVICE' ? 'En service' : s === 'EN_REPARATION' ? 'En réparation' : s === 'HORS_SERVICE' ? 'Hors service' : s; }
 function statusClass(s){ return s === 'EN_SERVICE' ? 'badge-green' : s === 'EN_REPARATION' ? 'badge-orange' : 'badge-red'; }
 function fmtUrgency(u) { return u === 'overdue' ? 'En retard' : u === 'expired' ? 'Expiré' : u === 'urgent' ? 'Urgent' : u === 'soon' ? 'Bientôt' : u === 'warning' ? 'À surveiller' : u === 'critical' ? 'Critique' : 'Normal'; }
@@ -1104,13 +1104,13 @@ function buildPDFTable() {
   if (cat === 'finances' && sub === 'expenses' && data.value.expenses) {
     return {
       head: ['Date','Véhicule','Chauffeur','Station','Volume (L)','PU','Montant'],
-      body: (data.value.expenses.lines || []).map(r => [fmtDate(r.date), r.vehicle, r.driver, r.station, fmt(r.liters), r.unitPrice ? fmt(r.unitPrice) : '—', fmtCost(r.cost)]),
+      body: (data.value.expenses.lines || []).map(r => [fmtDate(r.date), r.vehicle, r.driver, r.station, fmt(r.liters), r.unitPrice ? fmt(r.unitPrice) : '-', fmtCost(r.cost)]),
     };
   }
   if (cat === 'vehicles' && sub === 'assignments' && data.value.assignments) {
     const rows = [
-      ...(data.value.assignments.userAssignments || []).map(r => [r.userName, r.userRole, r.vehicle, fmtDate(r.assignedAt), r.unassignedAt ? fmtDate(r.unassignedAt) : '—', r.active ? 'Actif' : 'Terminé']),
-      ...(data.value.assignments.driverAssignments || []).map(r => [r.driverName + ' (chauffeur)', r.licenseNo, r.vehicle, fmtDate(r.startDate), r.endDate ? fmtDate(r.endDate) : '—', r.active ? 'Actif' : 'Terminé']),
+      ...(data.value.assignments.userAssignments || []).map(r => [r.userName, r.userRole, r.vehicle, fmtDate(r.assignedAt), r.unassignedAt ? fmtDate(r.unassignedAt) : '-', r.active ? 'Actif' : 'Terminé']),
+      ...(data.value.assignments.driverAssignments || []).map(r => [r.driverName + ' (chauffeur)', r.licenseNo, r.vehicle, fmtDate(r.startDate), r.endDate ? fmtDate(r.endDate) : '-', r.active ? 'Actif' : 'Terminé']),
     ];
     return { head: ['Utilisateur / Chauffeur','Rôle / Permis','Véhicule','Début','Fin','Statut'], body: rows };
   }
@@ -1123,19 +1123,19 @@ function buildPDFTable() {
   if (cat === 'maintenance' && sub === 'done' && data.value.maintenanceDone) {
     return {
       head: ['Date','Véhicule','Type','Description','Km','Coût'],
-      body: (data.value.maintenanceDone.lines || []).map(r => [fmtDate(r.date), `${r.vehicle} ${r.vehicleLabel}`.trim(), r.type, r.description || '—', r.odometerKm ? fmt(r.odometerKm) : '—', r.cost ? fmtCost(r.cost) : '—']),
+      body: (data.value.maintenanceDone.lines || []).map(r => [fmtDate(r.date), `${r.vehicle} ${r.vehicleLabel}`.trim(), r.type, r.description || '-', r.odometerKm ? fmt(r.odometerKm) : '-', r.cost ? fmtCost(r.cost) : '-']),
     };
   }
   if (cat === 'maintenance' && sub === 'upcoming' && data.value.maintenanceUpcoming) {
     return {
       head: ['Véhicule','Type','Description','Échéance','Jours restants','Urgence'],
-      body: (data.value.maintenanceUpcoming.lines || []).map(r => [`${r.vehicle} ${r.vehicleLabel}`.trim(), r.type, r.description || '—', r.dueAt ? fmtDate(r.dueAt) : '—', r.daysLeft !== null ? r.daysLeft + ' j' : '—', fmtUrgency(r.urgency)]),
+      body: (data.value.maintenanceUpcoming.lines || []).map(r => [`${r.vehicle} ${r.vehicleLabel}`.trim(), r.type, r.description || '-', r.dueAt ? fmtDate(r.dueAt) : '-', r.daysLeft !== null ? r.daysLeft + ' j' : '-', fmtUrgency(r.urgency)]),
     };
   }
   if (cat === 'maintenance' && sub === 'alerts' && data.value.maintenanceAlerts) {
     return {
       head: ['Type','Véhicule','Description','Échéance','Jours','Statut'],
-      body: (data.value.maintenanceAlerts.alerts || []).map(r => [fmtAlertType(r.type), r.vehiclePlate, r.label, r.dueDate ? fmtDate(r.dueDate) : '—', r.daysLeft !== null ? r.daysLeft + ' j' : '—', fmtUrgency(r.status)]),
+      body: (data.value.maintenanceAlerts.alerts || []).map(r => [fmtAlertType(r.type), r.vehiclePlate, r.label, r.dueDate ? fmtDate(r.dueDate) : '-', r.daysLeft !== null ? r.daysLeft + ' j' : '-', fmtUrgency(r.status)]),
     };
   }
   if (cat === 'audit' && sub === 'anomalies' && data.value.anomalies) {
@@ -1147,7 +1147,7 @@ function buildPDFTable() {
   if (cat === 'audit' && sub === 'stock' && data.value.stock) {
     return {
       head: ['Station','Cuve','Type','Réel (L)','Théorique (L)','Écart (L)','Écart %','Remplissage','Statut'],
-      body: (data.value.stock.tanks || []).map(r => [r.station, r.tankName, r.fuelType, fmt(r.currentL), fmt(r.theoreticalL), (r.ecartL >= 0 ? '+' : '')+fmt(r.ecartL), r.ecartPct !== null ? r.ecartPct+'%' : '—', r.fillPct+'%', r.status === 'critical' ? 'Critique' : r.status === 'warning' ? 'Attention' : 'OK']),
+      body: (data.value.stock.tanks || []).map(r => [r.station, r.tankName, r.fuelType, fmt(r.currentL), fmt(r.theoreticalL), (r.ecartL >= 0 ? '+' : '')+fmt(r.ecartL), r.ecartPct !== null ? r.ecartPct+'%' : '-', r.fillPct+'%', r.status === 'critical' ? 'Critique' : r.status === 'warning' ? 'Attention' : 'OK']),
     };
   }
   if (cat === 'audit' && sub === 'daily' && data.value.daily) {
@@ -1182,7 +1182,7 @@ function buildPDFTable() {
 </style>
 
 <style scoped>
-.mgmt-reports { padding: 1.5rem; font-family: inherit; }
+.mgmt-reports { padding: 0; width: 100%; box-sizing: border-box; font-family: inherit; }
 
 /* ══ PRINT ══ */
 .print-header { display: none; }

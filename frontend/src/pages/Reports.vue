@@ -1202,9 +1202,9 @@ onUnmounted(() => {
 
 <style scoped>
 .reports {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
   background: #f8fafc;
   min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -2089,10 +2089,6 @@ tbody tr:hover {
 }
 
 @media (max-width: 768px) {
-  .reports {
-    padding: 16px;
-  }
-
   .reports-header {
     flex-direction: column;
     align-items: flex-start;

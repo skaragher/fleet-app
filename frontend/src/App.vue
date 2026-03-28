@@ -432,12 +432,12 @@
       <main class="content">
         <div class="page-container">
           <RouterView />
+          <footer class="app-footer" v-if="auth.token">
+            <span>{{ companyFooter.left }}</span>
+            <span v-if="companyFooter.right">{{ companyFooter.right }}</span>
+            <span class="powered-by">Powered by YEFA TECHNOLOGIE</span>
+          </footer>
         </div>
-        <footer class="app-footer" v-if="auth.token">
-          <span>{{ companyFooter.left }}</span>
-          <span v-if="companyFooter.right">{{ companyFooter.right }}</span>
-          <span class="powered-by">Powered by YEFA TECHNOLOGIE</span>
-        </footer>
       </main>
     </div>
   </div>

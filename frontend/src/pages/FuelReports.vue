@@ -68,7 +68,7 @@
       <select v-if="savedFilters.length" v-model="selectedFilterId" @change="loadSavedFilter" class="filter-select">
         <option value="">Filtres sauvegardés</option>
         <option v-for="filter in savedFilters" :key="filter.id" :value="filter.id">
-          {{ filter.name }} ({{ filter.startDate }} — {{ filter.endDate }})
+          {{ filter.name }} ({{ filter.startDate }} - {{ filter.endDate }})
         </option>
       </select>
     </div>
@@ -188,9 +188,9 @@
               <td>{{ line.station }}</td>
               <td>{{ line.tank }} <span class="fuel-badge">{{ line.fuelType }}</span></td>
               <td class="num">{{ fmt(line.deliveredL) }}</td>
-              <td class="num">{{ line.unitPrice ? fmtCost(line.unitPrice) : '—' }}</td>
-              <td class="num">{{ line.cost > 0 ? fmtCost(line.cost) : '—' }}</td>
-              <td>{{ line.deliveryRef || '—' }}</td>
+              <td class="num">{{ line.unitPrice ? fmtCost(line.unitPrice) : '-' }}</td>
+              <td class="num">{{ line.cost > 0 ? fmtCost(line.cost) : '-' }}</td>
+              <td>{{ line.deliveryRef || '-' }}</td>
             </tr>
           </tbody>
         </table>
@@ -300,8 +300,8 @@
               <td>{{ line.station }}</td>
               <td><span class="fuel-badge">{{ line.fuelType }}</span></td>
               <td class="num">{{ fmt(line.liters) }}</td>
-              <td class="num">{{ line.cost > 0 ? fmtCost(line.cost) : '—' }}</td>
-              <td class="num">{{ line.odometerKm > 0 ? line.odometerKm.toLocaleString('fr-FR') : '—' }}</td>
+              <td class="num">{{ line.cost > 0 ? fmtCost(line.cost) : '-' }}</td>
+              <td class="num">{{ line.odometerKm > 0 ? line.odometerKm.toLocaleString('fr-FR') : '-' }}</td>
             </tr>
           </tbody>
         </table>
@@ -359,7 +359,7 @@
               </td>
               <td><span class="fuel-badge">{{ v.fuelType }}</span></td>
               <td class="num">{{ fmt(v.totalL) }}</td>
-              <td class="num">{{ v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '—' }}</td>
+              <td class="num">{{ v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '-' }}</td>
               <td class="num">
                 <span v-if="v.consumptionRate !== null && v.consumptionRate !== undefined" :class="rateClass(v.consumptionRate)">
                   {{ v.consumptionRate }} L/100km
@@ -421,9 +421,9 @@
                 <span class="vehicle-sub" v-if="v.make || v.model">{{ [v.make, v.model].filter(Boolean).join(' ') }}</span>
               </td>
               <td><span class="fuel-badge">{{ v.fuelType }}</span></td>
-              <td class="num">{{ v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '—' }}</td>
+              <td class="num">{{ v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '-' }}</td>
               <td class="num">{{ fmt(v.totalL) }}</td>
-              <td class="num">{{ v.normL !== null && v.normL !== undefined ? fmt(v.normL) : '—' }}</td>
+              <td class="num">{{ v.normL !== null && v.normL !== undefined ? fmt(v.normL) : '-' }}</td>
               <td class="num" :class="excessClass(v.excessL)">
                 {{ formatExcess(v.excessL) }}
               </td>
@@ -439,8 +439,8 @@
       </div>
 
       <div class="legend">
-        <span class="legend-item"><span class="status-badge status-critique">Critique</span> Surconsommation &gt;25% — risque fraude/fuite</span>
-        <span class="legend-item"><span class="status-badge status-attention">Attention</span> Surconsommation 10–25% — à surveiller</span>
+        <span class="legend-item"><span class="status-badge status-critique">Critique</span> Surconsommation &gt;25% - risque fraude/fuite</span>
+        <span class="legend-item"><span class="status-badge status-attention">Attention</span> Surconsommation 10–25% - à surveiller</span>
         <span class="legend-item"><span class="status-badge status-ok">Normal</span> Dans la norme (±10%)</span>
         <span class="legend-item"><span class="status-badge status-economie">Économique</span> Sous la norme de plus de 10%</span>
       </div>
@@ -743,12 +743,12 @@ function excessClass(val) {
 
 // CORRECTIF: formatage centralisé (évite la duplication inline dans le template)
 function formatExcess(val) {
-  if (val == null) return '—';
+  if (val == null) return '-';
   return (val > 0 ? '+' : '') + val;
 }
 
 function formatEcartPct(val) {
-  if (val == null) return '—';
+  if (val == null) return '-';
   return (val > 0 ? '+' : '') + val + '%';
 }
 
@@ -905,8 +905,8 @@ async function exportPDF() {
         head: [['Date', 'Fournisseur', 'Station', 'Cuve', 'Type', 'Volume (L)', 'Prix unit.', 'Coût', 'Réf.']],
         body: suppliesData.value.lines.map(l => [
           fmtDate(l.date), l.supplier, l.station, l.tank, l.fuelType,
-          fmt(l.deliveredL), l.unitPrice ? fmtCost(l.unitPrice) : '—',
-          l.cost > 0 ? fmtCost(l.cost) : '—', l.deliveryRef || '—',
+          fmt(l.deliveredL), l.unitPrice ? fmtCost(l.unitPrice) : '-',
+          l.cost > 0 ? fmtCost(l.cost) : '-', l.deliveryRef || '-',
         ]),
         styles: { fontSize: 7 }, headStyles, margin,
       });
@@ -940,8 +940,8 @@ async function exportPDF() {
         head: [['Date', 'Véhicule', 'Chauffeur', 'Station', 'Type', 'Litres', 'Coût', 'Km']],
         body: dispensesData.value.lines.map(l => [
           fmtDate(l.date), l.vehicle, l.driverName, l.station, l.fuelType,
-          fmt(l.liters), l.cost > 0 ? fmtCost(l.cost) : '—',
-          l.odometerKm > 0 ? l.odometerKm.toLocaleString('fr-FR') : '—',
+          fmt(l.liters), l.cost > 0 ? fmtCost(l.cost) : '-',
+          l.odometerKm > 0 ? l.odometerKm.toLocaleString('fr-FR') : '-',
         ]),
         styles: { fontSize: 7 }, headStyles, margin,
       });
@@ -958,8 +958,8 @@ async function exportPDF() {
         startY: doc.lastAutoTable.finalY + 10,
         head: [['Véhicule', 'Marque/Modèle', 'Type', 'Volume (L)', 'Km parcourus', 'L/100km', 'Moy/ravit.', 'Nb ravit.']],
         body: consumptionData.value.vehicles.map(v => [
-          v.plate, [v.make, v.model].filter(Boolean).join(' ') || '—', v.fuelType,
-          fmt(v.totalL), v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '—',
+          v.plate, [v.make, v.model].filter(Boolean).join(' ') || '-', v.fuelType,
+          fmt(v.totalL), v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '-',
           v.consumptionRate != null ? v.consumptionRate + ' L/100km' : 'N/A',
           v.avgPerFill + ' L', v.count,
         ]),
@@ -989,9 +989,9 @@ async function exportPDF() {
         head: [['Véhicule', 'Type', 'Km', 'Vol. réel (L)', 'Vol. norme (L)', 'Écart (L)', 'Écart (%)', 'Statut']],
         body: comparisonData.value.vehicles.map(v => [
           v.plate, v.fuelType,
-          v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '—',
+          v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '-',
           fmt(v.totalL),
-          v.normL != null ? fmt(v.normL) : '—',
+          v.normL != null ? fmt(v.normL) : '-',
           formatExcess(v.excessL),
           formatEcartPct(v.ecartPct),
           statusLabel(v.status),
@@ -1080,8 +1080,9 @@ onUnmounted(() => {
 
 <style scoped>
 .fuel-reports {
-  padding: 24px;
-  max-width: 1200px;
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .page-header { margin-bottom: 20px; }
@@ -1310,7 +1311,7 @@ onUnmounted(() => {
   font-weight: 700;
   vertical-align: middle;
 }
-/* th.num ET td.num alignés à droite — le header suit son contenu */
+/* th.num ET td.num alignés à droite - le header suit son contenu */
 .num { text-align: right; }
 .report-table th.num { text-align: right; }
 
