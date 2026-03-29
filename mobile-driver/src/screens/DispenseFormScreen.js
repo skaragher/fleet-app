@@ -50,10 +50,16 @@ const DispenseFormScreen = ({ route, navigation }) => {
   const { vehicle, context } = route.params || {};
   const { user } = useAuth();
 
-  const tanks = context?.station?.tanks || [];
+  const allTanks = context?.station?.tanks || [];
   const stationId = context?.station?.id || "";
 
-  const [tankId, setTankId] = useState(tanks[0]?.id || "");
+  // Filtrer les cuves par type de carburant du véhicule
+  const compatibleTanks = vehicle?.fuelType
+    ? allTanks.filter((t) => t.fuelType === vehicle.fuelType)
+    : allTanks;
+  const tanks = compatibleTanks; // cuves compatibles uniquement
+
+  const [tankId, setTankId] = useState(compatibleTanks[0]?.id || "");
   const [liters, setLiters] = useState("");
   const [odometerKm, setOdometerKm] = useState(
     vehicle?.odometerKm ? String(vehicle.odometerKm) : ""
@@ -65,6 +71,13 @@ const DispenseFormScreen = ({ route, navigation }) => {
   const selectedTank = tanks.find((t) => t.id === tankId);
 
   const validate = () => {
+    if (tanks.length === 0) {
+      Alert.alert(
+        "Ravitaillement impossible",
+        `Aucune cuve ${FUEL_LABELS[vehicle?.fuelType] || ""} disponible à cette station.`
+      );
+      return false;
+    }
     const litersNum = parseInt(liters, 10);
     if (!liters || isNaN(litersNum) || litersNum <= 0) {
       Alert.alert("Erreur", "Veuillez entrer un nombre de litres valide.");
@@ -174,8 +187,22 @@ const DispenseFormScreen = ({ route, navigation }) => {
           {/* ── Formulaire ─────────────────────────────────────────── */}
           <View style={styles.form}>
 
-            {/* Sélection de la cuve */}
-            <Field label="Cuve / Carburant" icon="flask-outline" iconColor="#0891b2" required>
+            {/* Sélection de la cuve — filtrée par type de carburant du véhicule */}
+            <Field
+              label={`Cuve — ${FUEL_LABELS[vehicle?.fuelType] || vehicle?.fuelType || "Carburant"}`}
+              icon="flask-outline"
+              iconColor="#0891b2"
+              required
+            >
+              {/* Badge type carburant du véhicule */}
+              {vehicle?.fuelType && (
+                <View style={styles.fuelLockBadge}>
+                  <Ionicons name="lock-closed" size={12} color="#0891b2" />
+                  <Text style={styles.fuelLockText}>
+                    Seules les cuves {FUEL_LABELS[vehicle.fuelType] || vehicle.fuelType} sont disponibles
+                  </Text>
+                </View>
+              )}
               <View style={styles.tanksGrid}>
                 {tanks.map((tank) => {
                   const isSelected = tankId === tank.id;
@@ -204,7 +231,12 @@ const DispenseFormScreen = ({ route, navigation }) => {
                   );
                 })}
                 {tanks.length === 0 && (
-                  <Text style={styles.noTanks}>Aucune cuve disponible</Text>
+                  <View style={styles.noTanksBox}>
+                    <Ionicons name="warning-outline" size={20} color="#dc2626" />
+                    <Text style={styles.noTanksText}>
+                      Aucune cuve {FUEL_LABELS[vehicle?.fuelType] || ""} disponible à cette station
+                    </Text>
+                  </View>
                 )}
               </View>
             </Field>
@@ -386,6 +418,29 @@ const styles = StyleSheet.create({
   tankOptionLevel: { fontSize: 12, fontWeight: "700", color: "#0891b2", textAlign: "center" },
   tankOptionNameSelected: { color: "#ffffff" },
   tankOptionLevelLow: { color: "#ef4444" },
+  fuelLockBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#e0f2fe",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
+  },
+  fuelLockText: { fontSize: 12, color: "#0891b2", fontWeight: "600" },
+  noTanksBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#fef2f2",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    flex: 1,
+  },
+  noTanksText: { fontSize: 13, color: "#dc2626", fontWeight: "600", flex: 1 },
   noTanks: { fontSize: 13, color: "#94a3b8", fontStyle: "italic" },
 
   // Inputs
