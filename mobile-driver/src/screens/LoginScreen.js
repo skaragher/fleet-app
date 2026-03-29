@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,6 +22,7 @@ const LoginScreen = () => {
   const [licenseNo, setLicenseNo] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async () => {
     setLoading(true);
@@ -36,7 +38,8 @@ const LoginScreen = () => {
 
   return (
     <Screen scroll={false}>
-      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={styles.root} behavior="padding" keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={[styles.shell, isTablet && styles.shellTablet]}>
           <View style={[styles.hero, isTablet && styles.heroTablet]}>
             <View style={styles.brandChip}>
@@ -64,13 +67,15 @@ const LoginScreen = () => {
             <Text style={[styles.welcome, isTablet && styles.welcomeTablet]}>Bienvenue !</Text>
             <Text style={styles.welcomeSub}>Connectez-vous pour accéder à votre espace.</Text>
 
-            <Text style={styles.label}>Numéro de permis</Text>
+            <Text style={styles.label}>Identifiant</Text>
             <View style={styles.inputWrap}>
               <Feather name="credit-card" size={18} color="#94a3b8" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Ex: AB123456"
-                autoCapitalize="characters"
+                placeholder="Email ou n° de permis"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
                 value={licenseNo}
                 onChangeText={setLicenseNo}
               />
@@ -80,12 +85,15 @@ const LoginScreen = () => {
             <View style={styles.inputWrap}>
               <Feather name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, styles.inputWithToggle]}
                 placeholder="Votre code"
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={setPassword}
               />
+              <TouchableOpacity style={styles.eyeToggle} onPress={() => setShowPassword(v => !v)}>
+                <Feather name={showPassword ? "eye-off" : "eye"} size={18} color="#94a3b8" />
+              </TouchableOpacity>
             </View>
 
             {!!error && <Text style={styles.error}>{error}</Text>}
@@ -99,6 +107,7 @@ const LoginScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -107,6 +116,11 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   shell: {
     flex: 1,
@@ -251,6 +265,15 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     paddingVertical: 12,
     fontSize: 15,
+  },
+  inputWithToggle: {
+    paddingRight: 44,
+  },
+  eyeToggle: {
+    position: "absolute",
+    right: 12,
+    zIndex: 1,
+    padding: 4,
   },
   error: {
     color: "#b91c1c",

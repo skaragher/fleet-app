@@ -3,9 +3,8 @@ import { Animated, useWindowDimensions } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import DriverDashboardScreen from "../screens/DriverDashboardScreen";
-import DriverVehicleScreen from "../screens/DriverVehicleScreen";
-import DriverReportsScreen from "../screens/DriverReportsScreen";
+import StationHomeScreen from "../screens/StationHomeScreen";
+import StationHistoryScreen from "../screens/StationHistoryScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 
 const Tab = createBottomTabNavigator();
@@ -29,30 +28,27 @@ const AnimatedTabIcon = ({ focused, onName, offName, color, size }) => {
   );
 };
 
-const DriverTabs = () => {
+const iconByRoute = {
+  StationHome: { on: "qr-code", off: "qr-code-outline" },
+  StationHistory: { on: "receipt", off: "receipt-outline" },
+  StationProfil: { on: "person-circle", off: "person-circle-outline" },
+};
+
+const StationManagerTabs = () => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isTablet = width >= 768;
-  const iconByRoute = {
-    Dashboard: { on: "grid", off: "grid-outline" },
-    MonVehicule: { on: "car", off: "car-outline" },
-    Rapports: { on: "stats-chart", off: "stats-chart-outline" },
-    Profil: { on: "person-circle", off: "person-circle-outline" },
-  };
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarLabelStyle: { fontSize: isTablet ? 13 : 11, fontWeight: "700", marginBottom: isTablet ? 2 : 2 },
-        tabBarItemStyle: {
-          paddingVertical: isTablet ? 6 : 4,
-        },
+        tabBarLabelStyle: { fontSize: isTablet ? 13 : 11, fontWeight: "700" },
+        tabBarItemStyle: { paddingVertical: isTablet ? 6 : 4 },
         tabBarStyle: {
           height: (isTablet ? 72 : 64) + Math.max(insets.bottom, 8),
           paddingTop: isTablet ? 6 : 4,
           paddingBottom: Math.max(insets.bottom, 8),
-          position: "relative",
           borderTopColor: "#c7d2fe",
           borderTopWidth: 1,
           backgroundColor: "#ffffff",
@@ -78,12 +74,23 @@ const DriverTabs = () => {
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DriverDashboardScreen} options={{ title: "Accueil" }} />
-      <Tab.Screen name="MonVehicule" component={DriverVehicleScreen} options={{ title: "Mon véhicule" }} />
-      <Tab.Screen name="Rapports" component={DriverReportsScreen} />
-      <Tab.Screen name="Profil" component={ProfileScreen} />
+      <Tab.Screen
+        name="StationHome"
+        component={StationHomeScreen}
+        options={{ title: "Ravitaillement" }}
+      />
+      <Tab.Screen
+        name="StationHistory"
+        component={StationHistoryScreen}
+        options={{ title: "Historique" }}
+      />
+      <Tab.Screen
+        name="StationProfil"
+        component={ProfileScreen}
+        options={{ title: "Profil" }}
+      />
     </Tab.Navigator>
   );
 };
 
-export default DriverTabs;
+export default StationManagerTabs;

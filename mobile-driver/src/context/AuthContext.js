@@ -16,20 +16,30 @@ const getAllRoles = (user) => {
 };
 
 const hasDriverRole = (user) => getAllRoles(user).includes("DRIVER");
+const hasStationManagerRole = (user) => getAllRoles(user).includes("STATION_MANAGER");
+// Rôles autorisés sur l'application mobile
+const hasAllowedRole = (user) => hasDriverRole(user) || hasStationManagerRole(user);
 
-const normalizeDriverMobileUser = (user) => {
+const normalizeMobileUser = (user) => {
   if (!user) return user;
-  if (!hasDriverRole(user)) return user;
-  const normalizedRoles = Array.from(new Set([...(Array.isArray(user.roles) ? user.roles : []), "DRIVER"]));
-  if (String(user.role || "").toUpperCase() === "DRIVER") {
-    return { ...user, roles: normalizedRoles };
+  const allRoles = getAllRoles(user);
+
+  // Chauffeur : forcer role = DRIVER
+  if (hasDriverRole(user)) {
+    const normalizedRoles = Array.from(new Set([...(Array.isArray(user.roles) ? user.roles : []), "DRIVER"]));
+    if (String(user.role || "").toUpperCase() === "DRIVER") {
+      return { ...user, roles: normalizedRoles };
+    }
+    return { ...user, mobileOriginalRole: user.role || null, role: "DRIVER", roles: normalizedRoles };
   }
-  return {
-    ...user,
-    mobileOriginalRole: user.role || null,
-    role: "DRIVER",
-    roles: normalizedRoles,
-  };
+
+  // Gestionnaire de station : conserver le rôle tel quel
+  if (hasStationManagerRole(user)) {
+    const normalizedRoles = Array.from(new Set([...(Array.isArray(user.roles) ? user.roles : []), "STATION_MANAGER"]));
+    return { ...user, role: "STATION_MANAGER", roles: normalizedRoles };
+  }
+
+  return user;
 };
 
 export const AuthProvider = ({ children }) => {
@@ -52,7 +62,7 @@ export const AuthProvider = ({ children }) => {
 
         if (storedToken && storedUser) {
           const parsed = JSON.parse(storedUser);
-          if (!hasDriverRole(parsed)) {
+          if (!hasAllowedRole(parsed)) {
             await Promise.all([
               AsyncStorage.removeItem(AUTH_TOKEN_KEY),
               AsyncStorage.removeItem(AUTH_USER_KEY),
@@ -60,7 +70,7 @@ export const AuthProvider = ({ children }) => {
             setApiToken(null);
             return;
           }
-          const normalized = normalizeDriverMobileUser(parsed);
+          const normalized = normalizeMobileUser(parsed);
           setToken(storedToken);
           setUser(normalized);
           setApiToken(storedToken);
@@ -84,10 +94,10 @@ export const AuthProvider = ({ children }) => {
       throw new Error("Réponse de connexion invalide.");
     }
 
-    if (!hasDriverRole(nextUser)) {
-      throw new Error("Cette application est réservée aux chauffeurs.");
+    if (!hasAllowedRole(nextUser)) {
+      throw new Error("Accès réservé aux chauffeurs et gestionnaires de station.");
     }
-    const mobileUser = normalizeDriverMobileUser(nextUser);
+    const mobileUser = normalizeMobileUser(nextUser);
 
     await Promise.all([
       AsyncStorage.setItem(AUTH_TOKEN_KEY, nextToken),
@@ -113,11 +123,11 @@ export const AuthProvider = ({ children }) => {
     const response = await authApi.me();
     const me = response?.data?.user;
     if (me) {
-      if (!hasDriverRole(me)) {
+      if (!hasAllowedRole(me)) {
         await logout();
         return null;
       }
-      const mobileUser = normalizeDriverMobileUser(me);
+      const mobileUser = normalizeMobileUser(me);
       setUser(mobileUser);
       await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(mobileUser));
     }
@@ -133,13 +143,11 @@ export const AuthProvider = ({ children }) => {
 
       refreshInProgressRef.current = true;
       try {
-        // Déclenche systématiquement le reload des écrans
         setRefreshTick(Date.now());
         lastAutoRefreshRef.current = Date.now();
-        // Puis tente la synchronisation du profil (si réseau/API OK)
         await refreshMe();
       } catch {
-        // Pas de connexion ou API indisponible: on ignore et on retente au prochain cycle
+        // Pas de connexion ou API indisponible : on ignore et retente au prochain cycle
       } finally {
         refreshInProgressRef.current = false;
       }
@@ -170,6 +178,8 @@ export const AuthProvider = ({ children }) => {
       error,
       setError,
       isAuthenticated: !!token && !!user,
+      isDriver: user?.role === "DRIVER",
+      isStationManager: user?.role === "STATION_MANAGER",
       login,
       logout,
       refreshMe,

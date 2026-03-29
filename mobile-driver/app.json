@@ -16,11 +16,12 @@
     "android": {
       "package": "com.fleetenergy.driver",
       "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#1d4ed8",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
-      "versionCode": 3
+      "versionCode": 4
     },
     "ios": {
       "bundleIdentifier": "com.fleetenergy.driver",
@@ -36,6 +37,14 @@
       "resizeMode": "contain",
       "image": "./assets/splash-icon.png"
     },
-    "owner": "skaragher"
+    "owner": "skaragher",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "L'application a besoin de la caméra pour scanner les QR codes des véhicules."
+        }
+      ]
+    ]
   }
 }

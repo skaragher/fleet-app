@@ -28,7 +28,7 @@ const Screen = ({ children, scroll = true, refreshControl }) => {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#e3efff",
+    backgroundColor: "#eef2ff",
   },
   scroll: {
     paddingBottom: 24,

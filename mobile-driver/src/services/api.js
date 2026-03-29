@@ -35,4 +35,14 @@ export const driverApi = {
   dispenses: () => api.get("/fuel/dispenses"),
 };
 
+export const stationApi = {
+  // Contexte de la station (infos station + cuves + ravitaillements du jour)
+  context: () => api.get("/fuel/dispenses/station-context"),
+  // Recherche d'un véhicule par plaque
+  searchVehicle: (plate) =>
+    api.get(`/fuel/dispenses/vehicles-catalog?q=${encodeURIComponent(plate)}`),
+  // Enregistrer un ravitaillement
+  createDispense: (data) => api.post("/fuel/dispenses", data),
+};
+
 export default api;

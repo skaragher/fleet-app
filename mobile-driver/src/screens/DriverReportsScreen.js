@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { RefreshControl, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import Screen from "../components/Screen";
 import Card from "../components/Card";
 import CompanyHeader from "../components/CompanyHeader";
@@ -13,6 +14,55 @@ import {
   maintenanceTypeLabel,
 } from "../utils/maintenance";
 
+const PERIODS = [
+  { key: "DAY", label: "Aujourd'hui" },
+  { key: "MONTH", label: "Ce mois" },
+  { key: "YEAR", label: "Cette année" },
+];
+
+// ─── Stat tile ────────────────────────────────────────────────────────────────
+const StatTile = ({ label, value, unit, icon, iconColor }) => (
+  <View style={tileS.tile}>
+    <View style={[tileS.iconBox, { backgroundColor: iconColor + "18" }]}>
+      <Ionicons name={icon} size={18} color={iconColor} />
+    </View>
+    <Text style={tileS.value} numberOfLines={1} adjustsFontSizeToFit>
+      {value}
+    </Text>
+    {unit ? <Text style={[tileS.unit, { color: iconColor }]}>{unit}</Text> : null}
+    <Text style={tileS.label}>{label}</Text>
+  </View>
+);
+
+const tileS = StyleSheet.create({
+  tile: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 12,
+    gap: 2,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#1e3a8a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  iconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  value: { fontSize: 20, fontWeight: "900", color: "#0f172a", letterSpacing: -0.3 },
+  unit: { fontSize: 11, fontWeight: "700" },
+  label: { fontSize: 10, color: "#64748b", fontWeight: "600" },
+});
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 const DriverReportsScreen = () => {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -22,7 +72,7 @@ const DriverReportsScreen = () => {
   const [insurances, setInsurances] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [maintenances, setMaintenances] = useState([]);
-  const [period, setPeriod] = useState("DAY");
+  const [period, setPeriod] = useState("MONTH");
 
   const assignedVehicleId = String(user?.assignedVehicleId || "");
 
@@ -58,12 +108,24 @@ const DriverReportsScreen = () => {
 
   const totalAmount = useMemo(
     () =>
-      vehicleDispenses.reduce(
-        (sum, d) => sum + Number(d.liters || 0) * Number(d.unitPrice || 0),
-        0
-      ),
+      vehicleDispenses.reduce((sum, d) => sum + Number(d.liters || 0) * Number(d.unitPrice || 0), 0),
     [vehicleDispenses]
   );
+
+  const avgConsumption = useMemo(() => {
+    const values = vehicleDispenses
+      .map((d) => Number(d.vehicle?.avgConsumption || d.avgConsumption || 0))
+      .filter((v) => v > 0);
+    if (!values.length) return 0;
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+  }, [vehicleDispenses]);
+
+  const consumptionState = useMemo(() => {
+    if (avgConsumption <= 0) return { label: "Non disponible", color: "#64748b" };
+    if (avgConsumption < 8) return { label: "Bas", color: "#16a34a" };
+    if (avgConsumption <= 12) return { label: "Normal", color: "#1d4ed8" };
+    return { label: "Élevé", color: "#dc2626" };
+  }, [avgConsumption]);
 
   const latestInsurance = useMemo(
     () =>
@@ -85,19 +147,26 @@ const DriverReportsScreen = () => {
     [inspections, assignedVehicleId]
   );
 
-  const maintenanceList = useMemo(() => {
-    const list = maintenances
-      .filter((m) => String(m.vehicleId || m.vehicle?.id || "") === assignedVehicleId)
-      .filter(isPendingMaintenance);
-    return list
-      .slice()
-      .sort((a, b) => {
-        const aTime = a.dueAt ? new Date(a.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
-        const bTime = b.dueAt ? new Date(b.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
-        if (aTime !== bTime) return aTime - bTime;
-        return Number(a.odometerKm || Number.MAX_SAFE_INTEGER) - Number(b.odometerKm || Number.MAX_SAFE_INTEGER);
-      });
-  }, [maintenances, assignedVehicleId]);
+  const maintenanceList = useMemo(
+    () =>
+      maintenances
+        .filter((m) => String(m.vehicleId || m.vehicle?.id || "") === assignedVehicleId)
+        .filter(isPendingMaintenance)
+        .slice()
+        .sort((a, b) => {
+          const aTime = a.dueAt ? new Date(a.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+          const bTime = b.dueAt ? new Date(b.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+          if (aTime !== bTime) return aTime - bTime;
+          return Number(a.odometerKm || Number.MAX_SAFE_INTEGER) - Number(b.odometerKm || Number.MAX_SAFE_INTEGER);
+        }),
+    [maintenances, assignedVehicleId]
+  );
+
+  const currentVehicleOdometer = useMemo(() => {
+    const latest = vehicleDispenses[0];
+    if (latest?.odometerKm) return Number(latest.odometerKm);
+    return Number(user?.assignedVehicle?.odometerKm || 0);
+  }, [vehicleDispenses, user]);
 
   const getDispenseStationName = (d) =>
     d?.station?.name || d?.tank?.station?.name || "Non renseignée";
@@ -120,293 +189,238 @@ const DriverReportsScreen = () => {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, [refreshTick]);
+  useEffect(() => { load(); }, [refreshTick]);
 
-  const avgConsumption = useMemo(() => {
-    const values = vehicleDispenses
-      .map((d) => Number(d.vehicle?.avgConsumption || d.avgConsumption || 0))
-      .filter((v) => v > 0);
-    if (!values.length) return 0;
-    return values.reduce((sum, v) => sum + v, 0) / values.length;
-  }, [vehicleDispenses]);
-
-  const consumptionState = useMemo(() => {
-    if (avgConsumption <= 0 || Number.isNaN(avgConsumption)) return { label: "Non disponible", color: "#64748b" };
-    if (avgConsumption < 8) return { label: "Bas", color: "#16a34a" };
-    if (avgConsumption <= 12) return { label: "Normal", color: "#1d4ed8" };
-    return { label: "Élevé", color: "#dc2626" };
-  }, [avgConsumption]);
-  const currentVehicleOdometer = useMemo(() => {
-    const latest = vehicleDispenses[0];
-    if (latest?.odometerKm) return Number(latest.odometerKm);
-    return Number(user?.assignedVehicle?.odometerKm || 0);
-  }, [vehicleDispenses, user]);
   return (
-    <Screen
-      scroll
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} />}
-    >
+    <Screen scroll refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor="#1d4ed8" />}>
       <CompanyHeader subtitle="Rapports du chauffeur" />
-      <Text style={styles.title}>Rapports chauffeur</Text>
 
-      <View style={[styles.periodSwitch, isTablet && styles.periodSwitchTablet]}>
-        <TouchableOpacity
-          style={[styles.periodBtn, period === "DAY" && styles.periodBtnActive]}
-          onPress={() => setPeriod("DAY")}
-        >
-          <Text style={[styles.periodText, period === "DAY" && styles.periodTextActive]}>Jour</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.periodBtn, period === "MONTH" && styles.periodBtnActive]}
-          onPress={() => setPeriod("MONTH")}
-        >
-          <Text style={[styles.periodText, period === "MONTH" && styles.periodTextActive]}>Mois</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.periodBtn, period === "YEAR" && styles.periodBtnActive]}
-          onPress={() => setPeriod("YEAR")}
-        >
-          <Text style={[styles.periodText, period === "YEAR" && styles.periodTextActive]}>Année</Text>
-        </TouchableOpacity>
+      {/* ── Period switcher ───────────────────────────────────────────── */}
+      <View style={styles.periodBar}>
+        {PERIODS.map((p) => (
+          <TouchableOpacity
+            key={p.key}
+            style={[styles.periodBtn, period === p.key && styles.periodBtnActive]}
+            onPress={() => setPeriod(p.key)}
+          >
+            <Text style={[styles.periodText, period === p.key && styles.periodTextActive]}>
+              {p.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <View style={[styles.grid, isTablet && styles.gridTablet]}>
-        <View style={[styles.gridItem, isTablet && styles.gridItemTablet]}>
-          <Card title="Synthèse">
-            <Text style={styles.line}>Ravitaillements: {vehicleDispenses.length}</Text>
-            <Text style={styles.line}>Volume total: {totalLiters.toLocaleString()} L</Text>
-            <Text style={styles.emphasis}>Montant total: {formatCurrency(totalAmount)}</Text>
-            <Text style={styles.line}>
-              Conso moyenne: {avgConsumption > 0 ? `${avgConsumption.toFixed(1)} L/100km` : "-"}
-            </Text>
-            <Text style={[styles.badge, { color: consumptionState.color, borderColor: consumptionState.color }]}>
-              {consumptionState.label}
-            </Text>
-          </Card>
-        </View>
+      {/* ── Stat tiles ───────────────────────────────────────────────── */}
+      <View style={styles.tilesGrid}>
+        <StatTile
+          label="Ravitaillements"
+          value={`${vehicleDispenses.length}`}
+          icon="water-outline"
+          iconColor="#0891b2"
+        />
+        <StatTile
+          label="Volume total"
+          value={`${totalLiters.toLocaleString()}`}
+          unit="litres"
+          icon="flask-outline"
+          iconColor="#1d4ed8"
+        />
+      </View>
+      <View style={styles.tilesGrid}>
+        <StatTile
+          label="Montant total"
+          value={totalAmount > 0 ? `${Math.round(totalAmount / 1000)}k` : "0"}
+          unit="FCFA"
+          icon="cash-outline"
+          iconColor="#16a34a"
+        />
+        <StatTile
+          label="Conso moyenne"
+          value={avgConsumption > 0 ? `${avgConsumption.toFixed(1)}` : "—"}
+          unit={avgConsumption > 0 ? `L/100 · ${consumptionState.label}` : undefined}
+          icon="speedometer-outline"
+          iconColor={consumptionState.color}
+        />
+      </View>
 
-        <View style={[styles.gridItem, isTablet && styles.gridItemTablet]}>
-          <Card title="Assurance">
-            {latestInsurance ? (
-              <Text style={styles.emphasis}>
-                Fin: {formatDate(latestInsurance.endAt)} ({daysTo(latestInsurance.endAt)}j)
+      {/* ── Documents summary ────────────────────────────────────────── */}
+      <View style={[styles.docsRow, isTablet && styles.docsRowTablet]}>
+        <Card title="Assurance" icon="shield-checkmark-outline" iconColor="#16a34a" iconBg="#f0fdf4">
+          {latestInsurance ? (
+            <>
+              <Text style={styles.docDate}>Fin : {formatDate(latestInsurance.endAt)}</Text>
+              <Text style={[
+                styles.docDays,
+                daysTo(latestInsurance.endAt) < 15 ? styles.docRed : daysTo(latestInsurance.endAt) < 30 ? styles.docOrange : styles.docGreen
+              ]}>
+                {daysTo(latestInsurance.endAt) < 0
+                  ? "Expirée !"
+                  : `${daysTo(latestInsurance.endAt)} jours restants`}
               </Text>
-            ) : (
-              <Text style={styles.muted}>Aucune assurance</Text>
-            )}
-          </Card>
-        </View>
+            </>
+          ) : (
+            <Text style={styles.noDoc}>Aucune assurance</Text>
+          )}
+        </Card>
 
-        <View style={[styles.gridItem, isTablet && styles.gridItemTablet]}>
-          <Card title="Visite technique">
-            {latestInspection ? (
-              <Text style={styles.emphasis}>
-                Prochaine: {formatDate(latestInspection.nextInspect || latestInspection.scheduledAt)}
+        <Card title="Visite technique" icon="clipboard-outline" iconColor="#4f46e5" iconBg="#eef2ff">
+          {latestInspection ? (
+            <>
+              <Text style={styles.docDate}>
+                Prochaine : {formatDate(latestInspection.nextInspect || latestInspection.scheduledAt)}
               </Text>
-            ) : (
-              <Text style={styles.muted}>Aucune visite</Text>
-            )}
-          </Card>
-        </View>
+              <Text style={[
+                styles.docDays,
+                daysTo(latestInspection.nextInspect || latestInspection.scheduledAt) < 0 ? styles.docRed : styles.docGreen
+              ]}>
+                {daysTo(latestInspection.nextInspect || latestInspection.scheduledAt) < 0
+                  ? "En retard !"
+                  : `${daysTo(latestInspection.nextInspect || latestInspection.scheduledAt)} jours`}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.noDoc}>Aucune visite</Text>
+          )}
+        </Card>
+      </View>
 
-        <View style={[styles.gridItem, isTablet && styles.gridItemTablet]}>
-          <Card title="Maintenance">
-            <Text style={styles.line}>
-              Kilometrage actuel: {Number(currentVehicleOdometer || 0).toLocaleString()} km
-            </Text>
-            {maintenanceList.length > 0 ? (
-              maintenanceList.map((item) => {
-                const maintenanceAlert = getVidangeAlert(item, currentVehicleOdometer);
-                return (
-                  <View key={item.id} style={styles.maintenanceRow}>
-                    <Text style={styles.maintenanceTypeText}>Type: {maintenanceTypeLabel(item.maintenanceType)}</Text>
-                    <Text style={styles.line}>Detail: {item.description || "Entretien planifie"}</Text>
-                    <Text style={styles.emphasis}>{maintenanceDueLabel(item, formatDate)}</Text>
-                    {typeof item.odometerKm === "number" ? (
-                      <Text style={styles.emphasis}>
-                        Kilometrage entretien: {Number(item.odometerKm).toLocaleString()} km
-                      </Text>
-                    ) : null}
-                    {maintenanceAlert ? (
-                      <Text
-                        style={[
-                          styles.alertBadge,
-                          maintenanceAlert.level === "danger" ? styles.alertDanger : styles.alertWarning,
-                        ]}
-                      >
-                        {maintenanceAlert.text}
-                      </Text>
-                    ) : null}
-                  </View>
-                );
-              })
-            ) : (
-              <>
-                <Text style={styles.line}>Type: -</Text>
-                <Text style={styles.line}>Kilometrage entretien: -</Text>
-                <Text style={styles.muted}>Aucune maintenance planifiée</Text>
-              </>
-            )}
-          </Card>
-        </View>
-
-        <View style={[styles.gridItem, isTablet && styles.gridItemFullTablet]}>
-          <Card title="10 derniers ravitaillements">
-            {vehicleDispenses.slice(0, 10).map((d) => (
-              <View key={d.id} style={styles.row}>
-                <View style={styles.rowLeft}>
-                  <Text style={styles.emphasis}>
-                    {formatDate(d.dispensedAt)} à{" "}
-                    {new Date(d.dispensedAt).toLocaleTimeString("fr-FR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                  <Text style={styles.stationText}>Station: {getDispenseStationName(d)}</Text>
+      {/* ── Maintenance ──────────────────────────────────────────────── */}
+      {maintenanceList.length > 0 && (
+        <Card title="Maintenance" icon="construct-outline" iconColor="#7c3aed" iconBg="#f3e8ff">
+          <Text style={styles.odomLine}>
+            Kilométrage : {Number(currentVehicleOdometer || 0).toLocaleString()} km
+          </Text>
+          {maintenanceList.map((item) => {
+            const alert = getVidangeAlert(item, currentVehicleOdometer);
+            const isDanger = alert?.level === "danger";
+            return (
+              <View key={item.id} style={[styles.maintItem, isDanger ? styles.maintDanger : styles.maintWarning]}>
+                <View style={styles.maintHeader}>
+                  <Text style={styles.maintType}>{maintenanceTypeLabel(item.maintenanceType)}</Text>
+                  {alert && (
+                    <Text style={[styles.alertPill, isDanger ? styles.alertPillDanger : styles.alertPillWarning]}>
+                      {alert.text}
+                    </Text>
+                  )}
                 </View>
-                <View style={styles.rowRight}>
-                  <Text style={styles.line}>{Number(d.liters || 0).toLocaleString()} L</Text>
-                  <Text style={styles.emphasis}>{formatCurrency(Number(d.liters || 0) * Number(d.unitPrice || 0))}</Text>
+                <Text style={styles.maintDue}>{maintenanceDueLabel(item, formatDate)}</Text>
+              </View>
+            );
+          })}
+        </Card>
+      )}
+
+      {/* ── Dispense history ─────────────────────────────────────────── */}
+      <Card title="Historique des ravitaillements" icon="list-outline" iconColor="#0891b2" iconBg="#e0f2fe">
+        {vehicleDispenses.slice(0, 10).length === 0 ? (
+          <Text style={styles.noDoc}>Aucun ravitaillement sur cette période</Text>
+        ) : (
+          vehicleDispenses.slice(0, 10).map((d, idx) => {
+            const amount = Number(d.liters || 0) * Number(d.unitPrice || 0);
+            return (
+              <View key={d.id} style={[styles.dispRow, idx === 0 && styles.dispRowFirst]}>
+                <View style={styles.dispIconCol}>
+                  <View style={styles.dispDot} />
+                </View>
+                <View style={styles.dispLeft}>
+                  <Text style={styles.dispDate}>
+                    {formatDate(d.dispensedAt)} —{" "}
+                    {new Date(d.dispensedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                  <View style={styles.dispStationRow}>
+                    <Ionicons name="location-outline" size={11} color="#94a3b8" />
+                    <Text style={styles.dispStation}>{getDispenseStationName(d)}</Text>
+                  </View>
+                </View>
+                <View style={styles.dispRight}>
+                  <Text style={styles.dispLiters}>{Number(d.liters || 0).toLocaleString()} L</Text>
+                  {amount > 0 && <Text style={styles.dispAmount}>{formatCurrency(amount)}</Text>}
                 </View>
               </View>
-            ))}
-            {vehicleDispenses.length === 0 && <Text style={styles.muted}>Aucun ravitaillement</Text>}
-          </Card>
-        </View>
-      </View>
+            );
+          })
+        )}
+      </Card>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#1d4ed8",
-    marginBottom: 4,
-  },
-  line: {
-    fontSize: 14,
-    color: "#334155",
-  },
-  muted: {
-    fontSize: 13,
-    color: "#64748b",
-  },
-  row: {
+  // Period bar
+  periodBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-    paddingTop: 8,
-    marginTop: 8,
-  },
-  rowLeft: {
-    flex: 1,
-    gap: 2,
-  },
-  rowRight: {
-    alignItems: "flex-end",
-    gap: 2,
-  },
-  stationText: {
-    fontSize: 12,
-    color: "#64748b",
-  },
-  periodSwitch: {
-    flexDirection: "row",
-    gap: 8,
-    backgroundColor: "#dbeafe",
-    borderRadius: 10,
+    backgroundColor: "#e0e7ff",
+    borderRadius: 12,
     padding: 4,
-  },
-  periodSwitchTablet: {
-    alignSelf: "flex-start",
-    minWidth: 420,
+    gap: 4,
   },
   periodBtn: {
     flex: 1,
+    paddingVertical: 9,
+    borderRadius: 9,
     alignItems: "center",
-    paddingVertical: 8,
-    borderRadius: 8,
   },
-  periodBtnActive: {
-    backgroundColor: "#1d4ed8",
-  },
-  periodText: {
-    color: "#1e3a8a",
-    fontWeight: "700",
-    fontSize: 12,
-  },
-  periodTextActive: {
-    color: "#ffffff",
-  },
-  badge: {
-    alignSelf: "flex-start",
+  periodBtnActive: { backgroundColor: "#1d4ed8" },
+  periodText: { color: "#3730a3", fontWeight: "700", fontSize: 12 },
+  periodTextActive: { color: "#ffffff" },
+
+  // Tiles
+  tilesGrid: { flexDirection: "row", gap: 10 },
+
+  // Docs row
+  docsRow: { gap: 10 },
+  docsRowTablet: { flexDirection: "row" },
+  docDate: { fontSize: 13, color: "#334155", fontWeight: "500" },
+  docDays: { fontSize: 13, fontWeight: "700" },
+  docGreen: { color: "#16a34a" },
+  docOrange: { color: "#b45309" },
+  docRed: { color: "#dc2626" },
+  noDoc: { fontSize: 13, color: "#94a3b8" },
+
+  // Maintenance
+  odomLine: { fontSize: 12, color: "#64748b", fontWeight: "600" },
+  maintItem: { borderRadius: 10, padding: 10, gap: 3 },
+  maintWarning: { backgroundColor: "#fffbeb", borderWidth: 1, borderColor: "#f59e0b" },
+  maintDanger: { backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#ef4444" },
+  maintHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  maintType: { fontSize: 13, fontWeight: "800", color: "#0f172a", flex: 1 },
+  maintDue: { fontSize: 12, color: "#64748b", fontWeight: "500" },
+  alertPill: {
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    fontSize: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    fontSize: 10,
     fontWeight: "700",
   },
-  grid: {
-    gap: 12,
-  },
-  gridTablet: {
+  alertPillWarning: { color: "#b45309", borderColor: "#f59e0b", backgroundColor: "#fef9c3" },
+  alertPillDanger: { color: "#b91c1c", borderColor: "#ef4444", backgroundColor: "#fee2e2" },
+
+  // Dispense rows
+  dispRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  gridItem: {
-    width: "100%",
-  },
-  gridItemTablet: {
-    flexBasis: "48.8%",
-  },
-  gridItemFullTablet: {
-    flexBasis: "100%",
-  },
-  maintenanceRow: {
+    alignItems: "flex-start",
+    gap: 10,
     borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-    paddingTop: 8,
-    marginTop: 8,
+    borderTopColor: "#f1f5f9",
+    paddingTop: 10,
+    marginTop: 10,
   },
-  alertBadge: {
-    alignSelf: "flex-start",
-    marginTop: 6,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    fontSize: 12,
-    fontWeight: "700",
+  dispRowFirst: { borderTopWidth: 0, paddingTop: 0, marginTop: 0 },
+  dispIconCol: { alignItems: "center", paddingTop: 5 },
+  dispDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#0891b2",
   },
-  alertWarning: {
-    color: "#b45309",
-    borderColor: "#f59e0b",
-    backgroundColor: "#fffbeb",
-  },
-  alertDanger: {
-    color: "#b91c1c",
-    borderColor: "#ef4444",
-    backgroundColor: "#fef2f2",
-  },
-  maintenanceTypeText: {
-    fontSize: 15,
-    fontWeight: "900",
-    color: "#000000",
-  },
-  emphasis: {
-    fontSize: 14,
-    color: "#334155",
-    fontWeight: "700",
-  },
+  dispLeft: { flex: 1, gap: 2 },
+  dispDate: { fontSize: 13, color: "#0f172a", fontWeight: "600" },
+  dispStationRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+  dispStation: { fontSize: 11, color: "#94a3b8" },
+  dispRight: { alignItems: "flex-end", gap: 2 },
+  dispLiters: { fontSize: 15, fontWeight: "800", color: "#0891b2" },
+  dispAmount: { fontSize: 11, color: "#16a34a", fontWeight: "600" },
 });
 
 export default DriverReportsScreen;
-
-

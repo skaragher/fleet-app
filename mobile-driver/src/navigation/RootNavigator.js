@@ -4,17 +4,18 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import LoginScreen from "../screens/LoginScreen";
 import DriverTabs from "./DriverTabs";
+import StationManagerNavigator from "./StationManagerNavigator";
 import { useAuth } from "../context/AuthContext";
 
 const Stack = createNativeStackNavigator();
 
 const RootNavigator = () => {
-  const { loading, isAuthenticated } = useAuth();
+  const { loading, isAuthenticated, isStationManager } = useAuth();
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#1d4ed8" />
       </View>
     );
   }
@@ -24,6 +25,8 @@ const RootNavigator = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
+        ) : isStationManager ? (
+          <Stack.Screen name="StationManager" component={StationManagerNavigator} />
         ) : (
           <Stack.Screen name="DriverTabs" component={DriverTabs} />
         )}

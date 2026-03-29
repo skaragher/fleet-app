@@ -329,4 +329,47 @@ router.delete("/:id", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER"]), async (req
   }
 });
 
+// Contexte station pour gestionnaire mobile (station + cuves + ravitaillements du jour)
+router.get("/station-context", auth(["STATION_MANAGER", "SUPER_ADMIN", "FLEET_MANAGER"]), async (req, res, next) => {
+  try {
+    const scope = await buildUserScope(req.user);
+    const stationId = scope.assignedStationIds?.[0] || req.user.assignedStationId;
+    if (!stationId) {
+      return res.status(404).json({ message: "Aucune station assignée à ce compte." });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [station, todayDispenses] = await Promise.all([
+      prisma.station.findUnique({
+        where: { id: stationId },
+        include: {
+          tanks: {
+            orderBy: { name: "asc" },
+            select: { id: true, name: true, fuelType: true, currentL: true, lowAlertL: true, capacityL: true },
+          },
+        },
+      }),
+      prisma.fuelDispense.findMany({
+        where: { stationId, dispensedAt: { gte: today } },
+        orderBy: { dispensedAt: "desc" },
+        take: 50,
+        include: {
+          vehicle: { select: { plate: true, make: true, model: true } },
+          tank: { select: { name: true, fuelType: true } },
+          driver: { select: { fullName: true } },
+        },
+      }),
+    ]);
+
+    if (!station) return res.status(404).json({ message: "Station introuvable." });
+
+    res.json({ station, todayDispenses });
+  } catch (e) {
+    console.error("Erreur GET /station-context:", e);
+    next(e);
+  }
+});
+
 export default router;
