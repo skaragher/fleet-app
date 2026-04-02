@@ -44,6 +44,17 @@
         {
           "cameraPermission": "L'application a besoin de la caméra pour scanner les QR codes des véhicules."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true,
+            "networkSecurityConfig": {
+              "cleartextTrafficPermitted": true
+            }
+          }
+        }
       ]
     ]
   }
