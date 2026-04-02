@@ -78,7 +78,7 @@ router.post("/dispenses", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_
       newL: result.tankBefore - data.liters,
       relatedId: result.dispense.id,
       relatedType: "dispense",
-      notes: `Ravitaillement véhicule ${data.vehicleId} — ${data.liters}L`,
+      notes: `Ravitaillement véhicule ${data.vehicleId} - ${data.liters}L`,
     });
 
     res.status(201).json(result.dispense);
@@ -183,7 +183,7 @@ router.post("/supplies", auth(["SUPER_ADMIN","ADMIN","STATION_MANAGER"]), async 
       newL: result.tankBefore + data.deliveredL,
       relatedId: result.supply.id,
       relatedType: "supply",
-      notes: `Approvisionnement ${data.supplier || "—"} — ${data.deliveredL}L`,
+      notes: `Approvisionnement ${data.supplier || "-"} - ${data.deliveredL}L`,
     });
 
     res.status(201).json(result.supply);

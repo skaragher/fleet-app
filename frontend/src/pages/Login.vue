@@ -17,12 +17,12 @@
 
         <div class="promo-grid">
           <article class="promo-card">
-            <div class="promo-icon">📅</div>
-            <p>Gestion des réunions</p>
+            <div class="promo-icon">⛽</div>
+            <p>Suivi des dispensations carburant</p>
           </article>
           <article class="promo-card">
-            <div class="promo-icon">📋</div>
-            <p>Gestion projet et automatisation</p>
+            <div class="promo-icon">🚛</div>
+            <p>Gestion de flotte véhicules</p>
           </article>
           <article class="promo-card">
             <div class="promo-icon">🔒</div>

@@ -438,7 +438,7 @@
               <tbody>
                 <tr v-for="r in data.anomalies.anomalies" :key="r.plate" :class="['row-anomaly-' + r.severity]">
                   <td><strong>{{ r.plate }}</strong><br/><small>{{ r.vehicleLabel }}</small></td>
-                  <td><span v-if="r.category" class="category-badge-sm">{{ CATEGORY_LABELS[r.category] || r.category }}</span><span v-else class="text-muted">—</span></td>
+                  <td><span v-if="r.category" class="category-badge-sm">{{ CATEGORY_LABELS[r.category] || r.category }}</span><span v-else class="text-muted">-</span></td>
                   <td>{{ fmt(r.totalL) }}</td>
                   <td>{{ fmt(r.kmDriven) }}</td>
                   <td>{{ r.actualRate }} L/100km</td>
@@ -455,8 +455,8 @@
           <!-- Légende seuils -->
           <div class="anomaly-legend">
             <span class="anomaly-legend-title">Seuils d'alerte :</span>
-            <span class="anomaly-legend-item"><span class="urgency-badge urgency-overdue">Critique</span> Écart &gt; 25% — risque fraude/fuite</span>
-            <span class="anomaly-legend-item"><span class="urgency-badge urgency-soon">Attention</span> Écart 10–25% — à surveiller</span>
+            <span class="anomaly-legend-item"><span class="urgency-badge urgency-overdue">Critique</span> Écart &gt; 25% - risque fraude/fuite</span>
+            <span class="anomaly-legend-item"><span class="urgency-badge urgency-soon">Attention</span> Écart 10–25% - à surveiller</span>
           </div>
         </template>
 

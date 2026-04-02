@@ -396,7 +396,7 @@
       </div>
 
       <div class="norm-info">
-        <strong>Normes de consommation par catégorie</strong> — les véhicules sans catégorie utilisent <strong>{{ comparisonData.normL100km }} L/100km</strong>
+        <strong>Normes de consommation par catégorie</strong> - les véhicules sans catégorie utilisent <strong>{{ comparisonData.normL100km }} L/100km</strong>
         <div class="category-norms-grid">
           <span v-for="(norm, key) in CATEGORY_NORMS" :key="key" class="category-norm-chip">
             <span class="category-norm-label">{{ CATEGORY_LABELS[key] }}</span>
@@ -429,7 +429,7 @@
               </td>
               <td>
                 <span v-if="v.category" class="category-badge">{{ CATEGORY_LABELS[v.category] }}</span>
-                <span v-else class="no-category">—</span>
+                <span v-else class="no-category">-</span>
               </td>
               <td class="num"><strong>{{ v.normRate }}</strong></td>
               <td class="num">{{ v.kmDriven > 0 ? v.kmDriven.toLocaleString('fr-FR') : '-' }}</td>

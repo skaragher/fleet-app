@@ -41,7 +41,7 @@ export async function logStockAction({ tankId, stationId, action, userId, userNa
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GET /api/reconciliations — liste des rapprochements
+// GET /api/reconciliations - liste des rapprochements
 // ══════════════════════════════════════════════════════════════════════════════
 router.get("/", auth(MANAGE_ROLES), async (req, res, next) => {
   try {
@@ -84,7 +84,7 @@ router.get("/", auth(MANAGE_ROLES), async (req, res, next) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GET /api/reconciliations/audit — journal des opérations stock
+// GET /api/reconciliations/audit - journal des opérations stock
 // ══════════════════════════════════════════════════════════════════════════════
 router.get("/audit", auth(MANAGE_ROLES), async (req, res, next) => {
   try {
@@ -127,7 +127,7 @@ router.get("/audit", auth(MANAGE_ROLES), async (req, res, next) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/reconciliations — créer un rapprochement
+// POST /api/reconciliations - créer un rapprochement
 // ══════════════════════════════════════════════════════════════════════════════
 router.post("/", auth(MANAGE_ROLES), async (req, res, next) => {
   try {
@@ -190,7 +190,7 @@ router.post("/", auth(MANAGE_ROLES), async (req, res, next) => {
           deltaL:      0,
           relatedId:   newRecon.id,
           relatedType: "reconciliation",
-          notes:       `Rapprochement créé — stock système: ${tank.currentL}L, stock physique: ${physicalLInt}L, écart: ${adjustmentL > 0 ? "+" : ""}${adjustmentL}L`,
+          notes:       `Rapprochement créé - stock système: ${tank.currentL}L, stock physique: ${physicalLInt}L, écart: ${adjustmentL > 0 ? "+" : ""}${adjustmentL}L`,
         },
       });
 
@@ -205,7 +205,7 @@ router.post("/", auth(MANAGE_ROLES), async (req, res, next) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PUT /api/reconciliations/:id/validate — valider ou rejeter
+// PUT /api/reconciliations/:id/validate - valider ou rejeter
 // ══════════════════════════════════════════════════════════════════════════════
 router.put("/:id/validate", auth(ADMIN_ROLES), async (req, res, next) => {
   try {
@@ -261,11 +261,11 @@ router.put("/:id/validate", auth(ADMIN_ROLES), async (req, res, next) => {
             deltaL:      recon.adjustmentL,
             relatedId:   id,
             relatedType: "reconciliation",
-            notes:       `Rapprochement VALIDÉ — stock ajusté de ${recon.systemL}L à ${recon.physicalL}L (${recon.adjustmentL > 0 ? "+" : ""}${recon.adjustmentL}L)`,
+            notes:       `Rapprochement VALIDÉ - stock ajusté de ${recon.systemL}L à ${recon.physicalL}L (${recon.adjustmentL > 0 ? "+" : ""}${recon.adjustmentL}L)`,
           },
         });
       } else {
-        // Rejet — trace seulement
+        // Rejet - trace seulement
         await tx.stockAuditLog.create({
           data: {
             tankId:      recon.tankId,
@@ -278,7 +278,7 @@ router.put("/:id/validate", auth(ADMIN_ROLES), async (req, res, next) => {
             deltaL:      0,
             relatedId:   id,
             relatedType: "reconciliation",
-            notes:       `Rapprochement REJETÉ — stock inchangé`,
+            notes:       `Rapprochement REJETÉ - stock inchangé`,
           },
         });
       }
@@ -294,7 +294,7 @@ router.put("/:id/validate", auth(ADMIN_ROLES), async (req, res, next) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// DELETE /api/reconciliations/:id — supprimer (PENDING uniquement)
+// DELETE /api/reconciliations/:id - supprimer (PENDING uniquement)
 // ══════════════════════════════════════════════════════════════════════════════
 router.delete("/:id", auth(ADMIN_ROLES), async (req, res, next) => {
   try {

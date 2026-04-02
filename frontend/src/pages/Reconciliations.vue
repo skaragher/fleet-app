@@ -74,7 +74,7 @@
             <tr v-for="r in items" :key="r.id" :class="rowClass(r)">
               <td>
                 <strong>{{ r.station?.name }}</strong>
-                <br /><small>{{ r.tank?.name }} — {{ r.tank?.fuelType }}</small>
+                <br /><small>{{ r.tank?.name }} - {{ r.tank?.fuelType }}</small>
               </td>
               <td><span class="fuel-badge">{{ r.tank?.fuelType }}</span></td>
               <td class="num">{{ fmt(r.systemL) }}</td>
@@ -82,7 +82,7 @@
               <td class="num" :class="r.adjustmentL < 0 ? 'text-red' : r.adjustmentL > 0 ? 'text-green' : ''">
                 <strong>{{ r.adjustmentL > 0 ? '+' : '' }}{{ fmt(r.adjustmentL) }}</strong>
               </td>
-              <td>{{ r.reason || '—' }}</td>
+              <td>{{ r.reason || '-' }}</td>
               <td>
                 {{ r.performer?.name }}
                 <br /><small class="role-label">{{ fmtRole(r.performer?.role) }}</small>
@@ -102,7 +102,7 @@
                   <button class="btn-sm btn-danger" @click="validate(r, 'REJECTED')" title="Rejeter">✘ Rejeter</button>
                   <button class="btn-sm btn-ghost" @click="deleteRecon(r)" title="Supprimer">🗑</button>
                 </template>
-                <span v-else class="text-muted">—</span>
+                <span v-else class="text-muted">-</span>
               </td>
             </tr>
           </tbody>
@@ -167,15 +167,15 @@
               <td><span class="action-badge" :class="'action-' + log.action.toLowerCase()">{{ actionLabel(log.action) }}</span></td>
               <td>
                 <strong>{{ log.station?.name }}</strong>
-                <br /><small>{{ log.tank?.name }} — {{ log.tank?.fuelType }}</small>
+                <br /><small>{{ log.tank?.name }} - {{ log.tank?.fuelType }}</small>
               </td>
-              <td>{{ log.userName || log.user?.name || '—' }}</td>
+              <td>{{ log.userName || log.user?.name || '-' }}</td>
               <td class="num">{{ fmt(log.previousL) }}</td>
               <td class="num">{{ fmt(log.newL) }}</td>
               <td class="num" :class="log.deltaL < 0 ? 'text-red' : log.deltaL > 0 ? 'text-green' : ''">
                 <strong>{{ log.deltaL > 0 ? '+' : '' }}{{ fmt(log.deltaL) }}</strong>
               </td>
-              <td class="notes-cell">{{ log.notes || '—' }}</td>
+              <td class="notes-cell">{{ log.notes || '-' }}</td>
             </tr>
           </tbody>
         </table>
@@ -207,7 +207,7 @@
             <select v-model="form.tankId" @change="onTankChange">
               <option value="">Sélectionner une cuve</option>
               <option v-for="t in filteredTanks" :key="t.id" :value="t.id">
-                {{ t.name }} — {{ t.fuelType }} ({{ fmt(t.currentL) }}/{{ fmt(t.capacityL) }}L)
+                {{ t.name }} - {{ t.fuelType }} ({{ fmt(t.currentL) }}/{{ fmt(t.capacityL) }}L)
               </option>
             </select>
           </div>
@@ -505,10 +505,10 @@ const deleteRecon = async (recon) => {
 };
 
 // ── Helpers ───────────────────────────────────────────────────
-function fmt(n) { return n != null ? Number(n).toLocaleString('fr-FR') : '—'; }
-function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('fr-FR'); }
+function fmt(n) { return n != null ? Number(n).toLocaleString('fr-FR') : '-'; }
+function fmtDate(d) { if (!d) return '-'; return new Date(d).toLocaleDateString('fr-FR'); }
 function fmtDateTime(d) {
-  if (!d) return '—';
+  if (!d) return '-';
   return new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 function statusLabel(s) {
@@ -519,7 +519,7 @@ function actionLabel(a) {
 }
 function fmtRole(r) {
   const map = { SUPER_ADMIN: 'Super Admin', FLEET_MANAGER: 'Gestionnaire Flotte', STATION_MANAGER: 'Gest. Station', FUEL_MANAGER: 'Gest. Carburant', DRIVER: 'Chauffeur', VIEWER: 'Observateur' };
-  return map[r] || r || '—';
+  return map[r] || r || '-';
 }
 function rowClass(r) {
   if (r.status === 'REJECTED') return 'row-rejected';

@@ -103,7 +103,7 @@
         <div class="input-group mini">
           <label>Catégorie</label>
           <select v-model="form.category">
-            <option :value="null">— Non définie —</option>
+            <option :value="null">- Non définie -</option>
             <option value="CITADINE">Citadine (7 L/100km)</option>
             <option value="BERLINE_SUV">Berline / SUV (10 L/100km)</option>
             <option value="PICKUP_4X4">Pick-up / 4x4 (12 L/100km)</option>
@@ -160,7 +160,7 @@
               </td>
               <td>{{ v.make }} {{ v.model }}</td>
               <td><span :class="['pill-fuel', v.fuelType.toLowerCase()]">{{ v.fuelType }}</span></td>
-              <td><span v-if="v.category" class="pill-category">{{ CATEGORY_LABELS[v.category] }}</span><span v-else class="muted">—</span></td>
+              <td><span v-if="v.category" class="pill-category">{{ CATEGORY_LABELS[v.category] }}</span><span v-else class="muted">-</span></td>
               <td>{{ formatDate(v.commissioningDate) }}</td>
               <td class="km-cell">{{ v.odometerKm.toLocaleString() }} km</td>
               <td>
