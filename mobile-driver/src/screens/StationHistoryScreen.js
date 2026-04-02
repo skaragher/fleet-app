@@ -16,13 +16,13 @@ const FUEL_LABELS = {
 };
 
 const formatTime = (value) => {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(value);
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 };
 
 const formatDate = (value) => {
-  if (!value) return "—";
+  if (!value) return "-";
   return new Date(value).toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "short",
@@ -62,7 +62,7 @@ const StationHistoryScreen = () => {
   // Grouper par cuve pour les stats
   const byTank = {};
   for (const d of dispenses) {
-    const key = d.tank?.name || "—";
+    const key = d.tank?.name || "-";
     if (!byTank[key]) byTank[key] = { liters: 0, count: 0, fuel: d.tank?.fuelType };
     byTank[key].liters += Number(d.liters || 0);
     byTank[key].count += 1;
@@ -83,7 +83,7 @@ const StationHistoryScreen = () => {
         style={styles.summaryBanner}
       >
         <View style={styles.summaryLeft}>
-          <Text style={styles.summaryLabel}>AUJOURD'HUI — {station?.name || "Ma station"}</Text>
+          <Text style={styles.summaryLabel}>AUJOURD'HUI - {station?.name || "Ma station"}</Text>
           <Text style={styles.summaryDate}>
             {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
           </Text>
@@ -108,7 +108,7 @@ const StationHistoryScreen = () => {
             <View key={name} style={styles.tankStatRow}>
               <View style={styles.tankStatLeft}>
                 <Text style={styles.tankStatName}>{name}</Text>
-                <Text style={styles.tankStatFuel}>{FUEL_LABELS[data.fuel] || data.fuel || "—"}</Text>
+                <Text style={styles.tankStatFuel}>{FUEL_LABELS[data.fuel] || data.fuel || "-"}</Text>
               </View>
               <View style={styles.tankStatRight}>
                 <Text style={styles.tankStatLiters}>{data.liters.toLocaleString()} L</Text>
@@ -153,7 +153,7 @@ const StationHistoryScreen = () => {
                   <View style={styles.dispMeta}>
                     <Ionicons name="flask-outline" size={11} color="#64748b" />
                     <Text style={styles.dispMetaText}>
-                      {d.tank?.name || "—"} · {FUEL_LABELS[d.tank?.fuelType] || d.tank?.fuelType || "—"}
+                      {d.tank?.name || "-"} · {FUEL_LABELS[d.tank?.fuelType] || d.tank?.fuelType || "-"}
                     </Text>
                     {amount > 0 && (
                       <>

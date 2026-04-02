@@ -47,7 +47,7 @@ const DaysBadge = ({ days, expiredLabel = "Expiré !", overdueLabel = "En retard
   const bg = expired ? "#fef2f2" : urgent ? "#fffbeb" : "#f0fdf4";
   return (
     <View style={[dayS.badge, { backgroundColor: bg, borderColor: color }]}>
-      <Text style={[dayS.days, { color }]}>{expired ? "—" : days}</Text>
+      <Text style={[dayS.days, { color }]}>{expired ? "-" : days}</Text>
       {!expired && <Text style={[dayS.unit, { color }]}>jours</Text>}
       <Text style={[dayS.status, { color }]}>{expired ? expiredLabel : days < 30 ? "Bientôt" : "Valide"}</Text>
     </View>
@@ -169,7 +169,7 @@ const DriverVehicleScreen = () => {
         <View style={styles.heroInner}>
           <View style={styles.plateContainer}>
             <Text style={styles.plateLabel}>PLAQUE</Text>
-            <Text style={styles.plateNumber}>{vehicle?.plate || "—"}</Text>
+            <Text style={styles.plateNumber}>{vehicle?.plate || "-"}</Text>
           </View>
           <View style={styles.heroMeta}>
             <Text style={styles.heroMakeModel}>
@@ -200,9 +200,9 @@ const DriverVehicleScreen = () => {
       <Card title="Caractéristiques" icon="information-circle-outline" iconColor="#1d4ed8" iconBg="#eff6ff">
         <View style={[styles.specsGrid, isTablet && styles.specsGridTablet]}>
           <SpecRow icon="speedometer-outline" label="KILOMÉTRAGE" value={`${Number(vehicle?.odometerKm || 0).toLocaleString()} km`} color="#1d4ed8" />
-          <SpecRow icon="flash-outline" label="CARBURANT" value={FUEL_LABELS[vehicle?.fuelType] || vehicle?.fuelType || "—"} color="#f59e0b" />
-          <SpecRow icon="car-outline" label="MARQUE / MODÈLE" value={[vehicle?.make, vehicle?.model].filter(Boolean).join(" ") || "—"} color="#4f46e5" />
-          <SpecRow icon="document-text-outline" label="CHÂSSIS" value={vehicle?.chassisNumber || "—"} color="#0891b2" />
+          <SpecRow icon="flash-outline" label="CARBURANT" value={FUEL_LABELS[vehicle?.fuelType] || vehicle?.fuelType || "-"} color="#f59e0b" />
+          <SpecRow icon="car-outline" label="MARQUE / MODÈLE" value={[vehicle?.make, vehicle?.model].filter(Boolean).join(" ") || "-"} color="#4f46e5" />
+          <SpecRow icon="document-text-outline" label="CHÂSSIS" value={vehicle?.chassisNumber || "-"} color="#0891b2" />
         </View>
       </Card>
 

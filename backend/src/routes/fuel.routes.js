@@ -3,6 +3,7 @@ import { prisma } from "../prisma.js";
 import { auth } from "../middleware/auth.js";
 import { parse, dispenseSchema, supplySchema } from "../validators.js";
 import { buildUserScope } from "../utils/userScope.js";
+import { logStockAction } from "./reconciliations.routes.js";
 
 const router = Router();
 
@@ -63,10 +64,24 @@ router.post("/dispenses", auth(["SUPER_ADMIN","ADMIN", "FLEET_MANAGER","STATION_
       await tx.tank.update({ where: { id: tank.id }, data: { currentL: { decrement: data.liters } } });
       await tx.vehicle.update({ where: { id: data.vehicleId }, data: { odometerKm: data.odometerKm } });
 
-      return dispense;
+      return { dispense, tankBefore: tank.currentL, stationId: tank.stationId };
     });
 
-    res.status(201).json(result);
+    // Audit log (hors transaction pour ne pas bloquer)
+    await logStockAction({
+      tankId: data.tankId,
+      stationId: result.stationId,
+      action: "DISPENSE",
+      userId: req.user.userId,
+      userName: req.user.name || req.user.email || null,
+      previousL: result.tankBefore,
+      newL: result.tankBefore - data.liters,
+      relatedId: result.dispense.id,
+      relatedType: "dispense",
+      notes: `Ravitaillement véhicule ${data.vehicleId} — ${data.liters}L`,
+    });
+
+    res.status(201).json(result.dispense);
   } catch (e) { next(e); }
 });
 
@@ -154,11 +169,24 @@ router.post("/supplies", auth(["SUPER_ADMIN","ADMIN","STATION_MANAGER"]), async 
         where: { id: data.tankId },
         data: { currentL: { increment: data.deliveredL } }
       });
-      
-      return supply;
+
+      return { supply, tankBefore: tank.currentL };
     });
-    
-    res.status(201).json(result);
+
+    await logStockAction({
+      tankId: data.tankId,
+      stationId: data.stationId,
+      action: "SUPPLY",
+      userId: req.user.userId,
+      userName: req.user.name || req.user.email || null,
+      previousL: result.tankBefore,
+      newL: result.tankBefore + data.deliveredL,
+      relatedId: result.supply.id,
+      relatedType: "supply",
+      notes: `Approvisionnement ${data.supplier || "—"} — ${data.deliveredL}L`,
+    });
+
+    res.status(201).json(result.supply);
   } catch (e) { next(e); }
 });
 

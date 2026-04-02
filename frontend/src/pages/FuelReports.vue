@@ -396,7 +396,13 @@
       </div>
 
       <div class="norm-info">
-        Norme par catégorie — les véhicules sans catégorie utilisent <strong>{{ comparisonData.normL100km }} L/100km</strong>
+        <strong>Normes de consommation par catégorie</strong> — les véhicules sans catégorie utilisent <strong>{{ comparisonData.normL100km }} L/100km</strong>
+        <div class="category-norms-grid">
+          <span v-for="(norm, key) in CATEGORY_NORMS" :key="key" class="category-norm-chip">
+            <span class="category-norm-label">{{ CATEGORY_LABELS[key] }}</span>
+            <span class="category-norm-value">{{ norm }} L/100km</span>
+          </span>
+        </div>
       </div>
 
       <div class="section-title">Analyse des écarts par véhicule</div>
@@ -486,6 +492,14 @@ const CATEGORY_LABELS = {
   PETIT_CAMION: 'Pt Camion',
   POIDS_LOURD:  'Poids Lourd',
   GROS_PORTEUR: 'Gros Porteur',
+};
+const CATEGORY_NORMS = {
+  CITADINE:     7,
+  BERLINE_SUV:  10,
+  PICKUP_4X4:   12,
+  PETIT_CAMION: 18,
+  POIDS_LOURD:  28,
+  GROS_PORTEUR: 38,
 };
 const loading = ref(false);
 const pdfExporting = ref(false);
@@ -1386,6 +1400,25 @@ onUnmounted(() => {
 .status-attention { background: #fef3c7; color: #92400e; }
 .status-ok       { background: #dcfce7; color: #166534; }
 .status-economie { background: #dbeafe; color: #1e40af; }
+
+.category-norms-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.category-norm-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  min-width: 90px;
+}
+.category-norm-label { font-size: 0.75rem; color: #64748b; font-weight: 600; }
+.category-norm-value { font-size: 0.85rem; color: #1d4ed8; font-weight: 800; margin-top: 2px; }
 
 .legend {
   display: flex;

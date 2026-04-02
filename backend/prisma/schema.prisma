@@ -25,11 +25,14 @@ model User {
   permissions        String[]
   assignedStation    Station?            @relation("StationManagers", fields: [assignedStationId], references: [id])
   assignedVehicle    Vehicle?            @relation("VehicleManagers", fields: [assignedVehicleId], references: [id])
-  vehicleAssignments VehicleAssignment[]
-  vehicleHistory     UserVehicleAssignment[] @relation("UserVehicleHistory")
-  assignedVehicleHistory UserVehicleAssignment[] @relation("UserVehicleAssignedBy")
-  loginHistories     LoginHistory[]
-  passwordResetTokens PasswordResetToken[]
+  vehicleAssignments          VehicleAssignment[]
+  vehicleHistory              UserVehicleAssignment[]    @relation("UserVehicleHistory")
+  assignedVehicleHistory      UserVehicleAssignment[]    @relation("UserVehicleAssignedBy")
+  loginHistories              LoginHistory[]
+  passwordResetTokens         PasswordResetToken[]
+  reconPerformed              StockReconciliation[]      @relation("ReconciliationPerformer")
+  reconValidated              StockReconciliation[]      @relation("ReconciliationValidator")
+  stockAuditLogs              StockAuditLog[]            @relation("StockAuditUser")
 
   @@index([assignedStationId])
   @@index([assignedVehicleId])
@@ -141,33 +144,37 @@ model VehicleAssignment {
 }
 
 model Station {
-  id          String         @id @default(cuid())
-  name        String
-  location    String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  address     String?
-  openingDate DateTime?
-  phone       String?
-  dispenses   FuelDispense[]
-  supplies    FuelSupply[]
-  tanks       Tank[]
-  managers    User[]         @relation("StationManagers")
+  id              String                @id @default(cuid())
+  name            String
+  location        String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  address         String?
+  openingDate     DateTime?
+  phone           String?
+  dispenses       FuelDispense[]
+  supplies        FuelSupply[]
+  tanks           Tank[]
+  managers        User[]                @relation("StationManagers")
+  reconciliations StockReconciliation[]
+  auditLogs       StockAuditLog[]
 }
 
 model Tank {
-  id        String         @id @default(cuid())
-  stationId String
-  fuelType  FuelType
-  capacityL Int
-  currentL  Int            @default(0)
-  lowAlertL Int            @default(100)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  name      String         @default("Cuve Générique")
-  dispenses FuelDispense[]
-  supplies  FuelSupply[]
-  station   Station        @relation(fields: [stationId], references: [id])
+  id              String                @id @default(cuid())
+  stationId       String
+  fuelType        FuelType
+  capacityL       Int
+  currentL        Int                   @default(0)
+  lowAlertL       Int                   @default(100)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  name            String                @default("Cuve Générique")
+  dispenses       FuelDispense[]
+  supplies        FuelSupply[]
+  station         Station               @relation(fields: [stationId], references: [id])
+  reconciliations StockReconciliation[]
+  auditLogs       StockAuditLog[]
 }
 
 model FuelSupply {
@@ -310,4 +317,72 @@ enum UserRole {
   VEHICLE_MANAGER
   DRIVER
   VIEWER
+}
+
+enum ReconciliationStatus {
+  PENDING
+  VALIDATED
+  REJECTED
+}
+
+enum StockAction {
+  SUPPLY
+  DISPENSE
+  RECONCILIATION
+  ADJUSTMENT
+}
+
+model StockReconciliation {
+  id          String               @id @default(cuid())
+  tankId      String
+  stationId   String
+  systemL     Int
+  physicalL   Int
+  adjustmentL Int
+  reason      String?
+  notes       String?
+  status      ReconciliationStatus @default(PENDING)
+  performedBy String
+  performedAt DateTime             @default(now())
+  validatedBy String?
+  validatedAt DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  tank      Tank    @relation(fields: [tankId], references: [id])
+  station   Station @relation(fields: [stationId], references: [id])
+  performer User    @relation("ReconciliationPerformer", fields: [performedBy], references: [id])
+  validator User?   @relation("ReconciliationValidator", fields: [validatedBy], references: [id])
+
+  @@index([tankId])
+  @@index([stationId])
+  @@index([performedBy])
+  @@index([performedAt])
+  @@index([status])
+}
+
+model StockAuditLog {
+  id          String      @id @default(cuid())
+  tankId      String
+  stationId   String
+  action      StockAction
+  userId      String?
+  userName    String?
+  previousL   Int
+  newL        Int
+  deltaL      Int
+  relatedId   String?
+  relatedType String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+
+  tank    Tank    @relation(fields: [tankId], references: [id])
+  station Station @relation(fields: [stationId], references: [id])
+  user    User?   @relation("StockAuditUser", fields: [userId], references: [id])
+
+  @@index([tankId])
+  @@index([stationId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
 }

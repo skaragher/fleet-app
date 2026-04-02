@@ -20,6 +20,25 @@ const PERIODS = [
   { key: "YEAR", label: "Cette année" },
 ];
 
+// Normes de consommation par catégorie (L/100km) — calquées sur le référentiel backend
+const CATEGORY_NORMS = {
+  CITADINE:     7,
+  BERLINE_SUV:  10,
+  PICKUP_4X4:   12,
+  PETIT_CAMION: 18,
+  POIDS_LOURD:  28,
+  GROS_PORTEUR: 38,
+};
+const CATEGORY_LABELS = {
+  CITADINE:     "Citadine",
+  BERLINE_SUV:  "Berline/SUV",
+  PICKUP_4X4:   "Pick-up/4x4",
+  PETIT_CAMION: "Petit camion",
+  POIDS_LOURD:  "Poids lourd",
+  GROS_PORTEUR: "Gros porteur",
+};
+const DEFAULT_NORM = 12;
+
 // ─── Stat tile ────────────────────────────────────────────────────────────────
 const StatTile = ({ label, value, unit, icon, iconColor }) => (
   <View style={tileS.tile}>
@@ -120,12 +139,25 @@ const DriverReportsScreen = () => {
     return values.reduce((sum, v) => sum + v, 0) / values.length;
   }, [vehicleDispenses]);
 
+  // Catégorie et norme du véhicule assigné (tirées des données de ravitaillement)
+  const vehicleCategory = useMemo(() => {
+    const first = vehicleDispenses.find((d) => d.vehicle?.category);
+    return first?.vehicle?.category || user?.assignedVehicle?.category || null;
+  }, [vehicleDispenses, user]);
+
+  const categoryNorm = useMemo(
+    () => (vehicleCategory ? (CATEGORY_NORMS[vehicleCategory] ?? DEFAULT_NORM) : DEFAULT_NORM),
+    [vehicleCategory]
+  );
+
   const consumptionState = useMemo(() => {
-    if (avgConsumption <= 0) return { label: "Non disponible", color: "#64748b" };
-    if (avgConsumption < 8) return { label: "Bas", color: "#16a34a" };
-    if (avgConsumption <= 12) return { label: "Normal", color: "#1d4ed8" };
-    return { label: "Élevé", color: "#dc2626" };
-  }, [avgConsumption]);
+    if (avgConsumption <= 0) return { label: "Non disponible", color: "#64748b", ecartPct: null };
+    const ecartPct = ((avgConsumption - categoryNorm) / categoryNorm) * 100;
+    if (ecartPct > 25)  return { label: "Critique",   color: "#dc2626", ecartPct };
+    if (ecartPct > 10)  return { label: "Attention",  color: "#f59e0b", ecartPct };
+    if (ecartPct < -10) return { label: "Économique", color: "#0891b2", ecartPct };
+    return               { label: "Normal",      color: "#16a34a", ecartPct };
+  }, [avgConsumption, categoryNorm]);
 
   const latestInsurance = useMemo(
     () =>
@@ -236,12 +268,52 @@ const DriverReportsScreen = () => {
         />
         <StatTile
           label="Conso moyenne"
-          value={avgConsumption > 0 ? `${avgConsumption.toFixed(1)}` : "—"}
+          value={avgConsumption > 0 ? `${avgConsumption.toFixed(1)}` : "-"}
           unit={avgConsumption > 0 ? `L/100 · ${consumptionState.label}` : undefined}
           icon="speedometer-outline"
           iconColor={consumptionState.color}
         />
       </View>
+
+      {/* ── Consommation détail ───────────────────────────────────── */}
+      {avgConsumption > 0 && (
+        <View style={styles.consoDetail}>
+          <View style={styles.consoRow}>
+            <Text style={styles.consoKey}>Calibre véhicule</Text>
+            <Text style={styles.consoVal}>
+              {vehicleCategory ? CATEGORY_LABELS[vehicleCategory] : "Non renseigné"}
+            </Text>
+          </View>
+          <View style={styles.consoRow}>
+            <Text style={styles.consoKey}>Norme calibre</Text>
+            <Text style={[styles.consoVal, { color: "#1d4ed8" }]}>{categoryNorm} L/100km</Text>
+          </View>
+          {consumptionState.ecartPct !== null && (
+            <View style={styles.consoRow}>
+              <Text style={styles.consoKey}>Écart vs norme</Text>
+              <Text style={[styles.consoVal, { color: consumptionState.color, fontWeight: "800" }]}>
+                {consumptionState.ecartPct > 0 ? "+" : ""}{consumptionState.ecartPct.toFixed(1)}%
+              </Text>
+            </View>
+          )}
+          {/* Légende seuils */}
+          <View style={styles.consoLegend}>
+            <Text style={styles.consoLegendTitle}>Seuils d'alerte :</Text>
+            {[
+              { label: "Critique",   color: "#dc2626", text: "> +25%" },
+              { label: "Attention",  color: "#f59e0b", text: "+10 à +25%" },
+              { label: "Normal",     color: "#16a34a", text: "± 10%" },
+              { label: "Économique", color: "#0891b2", text: "< -10%" },
+            ].map((s) => (
+              <View key={s.label} style={styles.consoLegendRow}>
+                <View style={[styles.consoLegendDot, { backgroundColor: s.color }]} />
+                <Text style={styles.consoLegendLabel}>{s.label}</Text>
+                <Text style={styles.consoLegendRange}>{s.text}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* ── Documents summary ────────────────────────────────────────── */}
       <View style={[styles.docsRow, isTablet && styles.docsRowTablet]}>
@@ -324,7 +396,7 @@ const DriverReportsScreen = () => {
                 </View>
                 <View style={styles.dispLeft}>
                   <Text style={styles.dispDate}>
-                    {formatDate(d.dispensedAt)} —{" "}
+                    {formatDate(d.dispensedAt)} -{" "}
                     {new Date(d.dispensedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                   </Text>
                   <View style={styles.dispStationRow}>
@@ -366,6 +438,36 @@ const styles = StyleSheet.create({
 
   // Tiles
   tilesGrid: { flexDirection: "row", gap: 10 },
+
+  // Consommation détail
+  consoDetail: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#1e3a8a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  consoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  consoKey: { fontSize: 12, color: "#64748b", fontWeight: "600" },
+  consoVal: { fontSize: 13, color: "#0f172a", fontWeight: "700" },
+  consoLegend: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+    paddingTop: 8,
+    gap: 4,
+  },
+  consoLegendTitle: { fontSize: 11, color: "#94a3b8", fontWeight: "700", marginBottom: 2 },
+  consoLegendRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  consoLegendDot: { width: 8, height: 8, borderRadius: 4 },
+  consoLegendLabel: { fontSize: 11, fontWeight: "700", color: "#334155", flex: 1 },
+  consoLegendRange: { fontSize: 11, color: "#64748b" },
 
   // Docs row
   docsRow: { gap: 10 },

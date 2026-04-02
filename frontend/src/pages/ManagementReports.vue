@@ -420,25 +420,43 @@
             <div class="summary-card red"><div class="summary-label">Critiques (&gt;25%)</div><div class="summary-value">{{ data.anomalies.summary.critical }}</div></div>
             <div class="summary-card orange"><div class="summary-label">Avertissements</div><div class="summary-value">{{ data.anomalies.summary.warning }}</div></div>
             <div class="summary-card"><div class="summary-label">Total anomalies</div><div class="summary-value">{{ data.anomalies.summary.total }}</div></div>
-            <div class="summary-card"><div class="summary-label">Norme</div><div class="summary-value">{{ data.anomalies.normL100km }} L/100km</div></div>
+            <div class="summary-card"><div class="summary-label">Seuil alerte</div><div class="summary-value">± {{ data.anomalies.thresholdPct }}%</div></div>
           </div>
+
+          <!-- Normes par catégorie -->
+          <div class="anomaly-norms-bar">
+            <span class="anomaly-norms-title">Normes par calibre :</span>
+            <span v-for="(norm, key) in CATEGORY_NORMS" :key="key" class="anomaly-norm-chip">
+              {{ CATEGORY_LABELS[key] }} : <strong>{{ norm }} L/100</strong>
+            </span>
+            <span class="anomaly-norm-chip anomaly-norm-default">Sans catégorie : <strong>{{ data.anomalies.normL100km }} L/100</strong></span>
+          </div>
+
           <div class="table-wrapper">
             <table class="data-table">
-              <thead><tr><th>Véhicule</th><th>Volume (L)</th><th>Km parcourus</th><th>Consomm. réelle</th><th>Norme</th><th>Écart %</th><th>Pleins</th><th>Sévérité</th></tr></thead>
+              <thead><tr><th>Véhicule</th><th>Catégorie</th><th>Volume (L)</th><th>Km parcourus</th><th>Consomm. réelle</th><th>Norme calibre</th><th>Écart %</th><th>Pleins</th><th>Sévérité</th></tr></thead>
               <tbody>
                 <tr v-for="r in data.anomalies.anomalies" :key="r.plate" :class="['row-anomaly-' + r.severity]">
                   <td><strong>{{ r.plate }}</strong><br/><small>{{ r.vehicleLabel }}</small></td>
+                  <td><span v-if="r.category" class="category-badge-sm">{{ CATEGORY_LABELS[r.category] || r.category }}</span><span v-else class="text-muted">—</span></td>
                   <td>{{ fmt(r.totalL) }}</td>
                   <td>{{ fmt(r.kmDriven) }}</td>
                   <td>{{ r.actualRate }} L/100km</td>
-                  <td>{{ r.normRate }} L/100km</td>
+                  <td><strong>{{ r.normRate }} L/100km</strong></td>
                   <td><strong :class="r.ecartPct > 0 ? 'text-red' : 'text-green'">{{ r.ecartPct > 0 ? '+' : '' }}{{ r.ecartPct }}%</strong></td>
                   <td>{{ r.fillCount }}</td>
                   <td><span class="urgency-badge" :class="r.severity === 'critical' ? 'urgency-overdue' : 'urgency-soon'">{{ r.severity === 'critical' ? 'Critique' : 'Attention' }}</span></td>
                 </tr>
-                <tr v-if="!data.anomalies.anomalies?.length"><td colspan="8" class="empty">Aucune anomalie détectée</td></tr>
+                <tr v-if="!data.anomalies.anomalies?.length"><td colspan="9" class="empty">Aucune anomalie détectée</td></tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Légende seuils -->
+          <div class="anomaly-legend">
+            <span class="anomaly-legend-title">Seuils d'alerte :</span>
+            <span class="anomaly-legend-item"><span class="urgency-badge urgency-overdue">Critique</span> Écart &gt; 25% — risque fraude/fuite</span>
+            <span class="anomaly-legend-item"><span class="urgency-badge urgency-soon">Attention</span> Écart 10–25% — à surveiller</span>
           </div>
         </template>
 
@@ -451,16 +469,18 @@
           </div>
           <div class="table-wrapper">
             <table class="data-table">
-              <thead><tr><th>Station</th><th>Cuve</th><th>Type</th><th>Capacité (L)</th><th>Réel (L)</th><th>Théorique (L)</th><th>Écart (L)</th><th>Écart %</th><th>Remplissage</th><th>Statut</th></tr></thead>
+              <thead><tr><th>Station</th><th>Cuve</th><th>Type</th><th>Capacité (L)</th><th>Stock système (L)</th><th>Total entrées (L)</th><th>Total sorties (L)</th><th>Cumulatif (L)</th><th>Écart (L)</th><th>Écart %</th><th>Remplissage</th><th>Statut</th></tr></thead>
               <tbody>
                 <tr v-for="r in data.stock.tanks" :key="r.tankId" :class="['row-stock-' + r.status]">
                   <td>{{ r.station }}</td>
                   <td>{{ r.tankName }}</td>
                   <td>{{ r.fuelType }}</td>
                   <td>{{ fmt(r.capacityL) }}</td>
-                  <td>{{ fmt(r.currentL) }}</td>
-                  <td>{{ fmt(r.theoreticalL) }}</td>
-                  <td :class="r.ecartL < 0 ? 'text-red' : 'text-green'">{{ r.ecartL > 0 ? '+' : '' }}{{ fmt(r.ecartL) }}</td>
+                  <td><strong>{{ fmt(r.currentL) }}</strong></td>
+                  <td class="text-green">+{{ fmt(r.totalIn) }}</td>
+                  <td class="text-red">-{{ fmt(r.totalOut) }}</td>
+                  <td>{{ fmt(r.cumulativeL) }}</td>
+                  <td :class="r.ecartL < 0 ? 'text-red' : r.ecartL > 0 ? 'text-green' : ''">{{ r.ecartL > 0 ? '+' : '' }}{{ fmt(r.ecartL) }}</td>
                   <td :class="r.ecartPct !== null && Math.abs(r.ecartPct) > 5 ? 'text-red' : ''">{{ r.ecartPct !== null ? r.ecartPct + '%' : '-' }}</td>
                   <td>
                     <div class="progress-bar">
@@ -1005,6 +1025,24 @@ onMounted(() => {
 
 watch(dailyDate, fetchData);
 
+// ── Référentiels catégories ───────────────────────────────────
+const CATEGORY_LABELS = {
+  CITADINE:     'Citadine',
+  BERLINE_SUV:  'Berline/SUV',
+  PICKUP_4X4:   'Pick-up/4x4',
+  PETIT_CAMION: 'Pt Camion',
+  POIDS_LOURD:  'Poids Lourd',
+  GROS_PORTEUR: 'Gros Porteur',
+};
+const CATEGORY_NORMS = {
+  CITADINE:     7,
+  BERLINE_SUV:  10,
+  PICKUP_4X4:   12,
+  PETIT_CAMION: 18,
+  POIDS_LOURD:  28,
+  GROS_PORTEUR: 38,
+};
+
 // ── Helpers ───────────────────────────────────────────────────
 function fmt(n)     { return n != null ? Number(n).toLocaleString('fr-FR') : '-'; }
 function fmtCost(n) { return n != null ? Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' FCFA' : '-'; }
@@ -1146,8 +1184,8 @@ function buildPDFTable() {
   }
   if (cat === 'audit' && sub === 'stock' && data.value.stock) {
     return {
-      head: ['Station','Cuve','Type','Réel (L)','Théorique (L)','Écart (L)','Écart %','Remplissage','Statut'],
-      body: (data.value.stock.tanks || []).map(r => [r.station, r.tankName, r.fuelType, fmt(r.currentL), fmt(r.theoreticalL), (r.ecartL >= 0 ? '+' : '')+fmt(r.ecartL), r.ecartPct !== null ? r.ecartPct+'%' : '-', r.fillPct+'%', r.status === 'critical' ? 'Critique' : r.status === 'warning' ? 'Attention' : 'OK']),
+      head: ['Station','Cuve','Type','Stock système (L)','Total entrées (L)','Total sorties (L)','Cumulatif (L)','Écart (L)','Écart %','Remplissage','Statut'],
+      body: (data.value.stock.tanks || []).map(r => [r.station, r.tankName, r.fuelType, fmt(r.currentL), fmt(r.totalIn), fmt(r.totalOut), fmt(r.cumulativeL), (r.ecartL >= 0 ? '+' : '')+fmt(r.ecartL), r.ecartPct !== null ? r.ecartPct+'%' : '-', r.fillPct+'%', r.status === 'critical' ? 'Critique' : r.status === 'warning' ? 'Attention' : 'OK']),
     };
   }
   if (cat === 'audit' && sub === 'daily' && data.value.daily) {
@@ -1418,6 +1456,61 @@ function buildPDFTable() {
 
 .section-date { color: #1e3a8a; font-size: 1rem; font-weight: 600; margin: 0 0 1rem; }
 small { color: #94a3b8; font-size: 0.75rem; }
+
+/* ── Anomalies normes & légende ── */
+.anomaly-norms-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+}
+.anomaly-norms-title { font-weight: 700; color: #0369a1; margin-right: 4px; }
+.anomaly-norm-chip {
+  background: #fff;
+  border: 1px solid #e0f2fe;
+  border-radius: 6px;
+  padding: 2px 8px;
+  color: #0f172a;
+  font-size: 0.78rem;
+}
+.anomaly-norm-chip strong { color: #1d4ed8; }
+.anomaly-norm-default { border-color: #e2e8f0; background: #f8fafc; }
+.anomaly-norm-default strong { color: #64748b; }
+
+.anomaly-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #fafafa;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+.anomaly-legend-title { font-weight: 700; color: #334155; }
+.anomaly-legend-item { display: flex; align-items: center; gap: 6px; }
+
+.category-badge-sm {
+  display: inline-block;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.text-muted { color: #94a3b8; }
 
 @media (max-width: 640px) {
   .category-tabs { gap: 0.25rem; }

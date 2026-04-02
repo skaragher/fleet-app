@@ -7,6 +7,16 @@ const router = Router();
 const ADMIN_ROLES  = ["SUPER_ADMIN", "ADMIN", "FLEET_MANAGER"];
 const ALL_ROLES    = ["SUPER_ADMIN", "ADMIN", "FLEET_MANAGER", "STATION_MANAGER"];
 
+// Normes de consommation standard par catégorie (L/100km)
+const CATEGORY_NORMS = {
+  CITADINE:     7,
+  BERLINE_SUV:  10,
+  PICKUP_4X4:   12,
+  PETIT_CAMION: 18,
+  POIDS_LOURD:  28,
+  GROS_PORTEUR: 38,
+};
+
 function getDateRange(req) {
   const startDate = req.query.startDate ? new Date(req.query.startDate) : new Date(new Date().getFullYear(), 0, 1);
   const endDate   = req.query.endDate   ? new Date(req.query.endDate)   : new Date();
@@ -441,7 +451,7 @@ router.get("/audit/anomalies", auth(ALL_ROLES), async (req, res, next) => {
     const dispenses = await prisma.fuelDispense.findMany({
       where,
       include: {
-        vehicle: { select: { id: true, plate: true, make: true, model: true } },
+        vehicle: { select: { id: true, plate: true, make: true, model: true, category: true } },
         driver:  { select: { id: true, fullName: true } },
         station: { select: { id: true, name: true } },
       },
@@ -455,6 +465,7 @@ router.get("/audit/anomalies", auth(ALL_ROLES), async (req, res, next) => {
         vehicleMap[vid] = {
           vehicleId: vid, plate: d.vehicle?.plate || vid,
           make: d.vehicle?.make || "", model: d.vehicle?.model || "",
+          category: d.vehicle?.category || null,
           totalL: 0, count: 0,
           odometerFirst: d.odometerKm || 0, odometerLast: d.odometerKm || 0,
         };
@@ -469,15 +480,17 @@ router.get("/audit/anomalies", auth(ALL_ROLES), async (req, res, next) => {
     for (const v of Object.values(vehicleMap)) {
       const kmDriven = v.odometerLast - v.odometerFirst;
       if (kmDriven <= 0) continue;
+      const vehicleNorm = v.category ? (CATEGORY_NORMS[v.category] ?? normL100km) : normL100km;
       const actualRate = (v.totalL / kmDriven) * 100;
-      const normL      = (normL100km / 100) * kmDriven;
+      const normL      = (vehicleNorm / 100) * kmDriven;
       const ecartPct   = normL > 0 ? ((v.totalL - normL) / normL) * 100 : null;
       if (ecartPct !== null && Math.abs(ecartPct) >= thresholdPct) {
         anomalies.push({
           plate: v.plate, vehicleLabel: `${v.make} ${v.model}`.trim(),
+          category: v.category,
           totalL: v.totalL, kmDriven,
           actualRate: Math.round(actualRate * 100) / 100,
-          normRate: normL100km,
+          normRate: vehicleNorm,
           ecartPct:  Math.round(ecartPct * 10) / 10,
           severity:  Math.abs(ecartPct) > 25 ? "critical" : "warning",
           fillCount: v.count,
@@ -489,6 +502,7 @@ router.get("/audit/anomalies", auth(ALL_ROLES), async (req, res, next) => {
     res.json({ success: true, data: {
       period: { startDate, endDate },
       normL100km, thresholdPct,
+      categoryNorms: CATEGORY_NORMS,
       summary: {
         total:    anomalies.length,
         critical: anomalies.filter(a => a.severity === "critical").length,
@@ -521,15 +535,20 @@ router.get("/audit/stock", auth(ALL_ROLES), async (req, res, next) => {
     const lines = tanks.map(t => {
       const totalIn  = t.supplies.reduce((s, x) => s + x.deliveredL, 0);
       const totalOut = t.dispenses.reduce((s, x) => s + x.liters, 0);
-      const theoreticalL = totalIn - totalOut;
-      const ecartL   = t.currentL - theoreticalL;
-      const ecartPct = theoreticalL > 0 ? (ecartL / theoreticalL) * 100 : null;
-      const status   = ecartPct === null ? "ok" : Math.abs(ecartPct) > 10 ? "critical" : Math.abs(ecartPct) > 5 ? "warning" : "ok";
+      // Le stock théorique (système) est currentL — maintenu transactionnellement
+      // totalIn - totalOut est fourni à titre informatif mais ne reflète pas le stock réel
+      // car il ignore le stock initial et les rapprochements validés.
+      const theoreticalL = t.currentL;
+      // Écart entre stock théorique et mouvement cumulé (peut indiquer des ajustements manuels)
+      const cumulativeL  = totalIn - totalOut;
+      const ecartL       = theoreticalL - cumulativeL;
+      const ecartPct     = cumulativeL > 0 ? (ecartL / cumulativeL) * 100 : null;
+      const status       = ecartPct === null ? "ok" : Math.abs(ecartPct) > 10 ? "critical" : Math.abs(ecartPct) > 5 ? "warning" : "ok";
       return {
         tankId: t.id, tankName: t.name,
         station: t.station?.name || "-", fuelType: t.fuelType,
         capacityL: t.capacityL, currentL: t.currentL, theoreticalL,
-        totalIn, totalOut,
+        totalIn, totalOut, cumulativeL,
         ecartL, ecartPct: ecartPct !== null ? Math.round(ecartPct * 100) / 100 : null,
         fillPct: t.capacityL > 0 ? Math.round((t.currentL / t.capacityL) * 100) : 0,
         lowAlert: t.currentL <= t.lowAlertL, status,

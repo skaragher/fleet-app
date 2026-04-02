@@ -16,7 +16,7 @@ const InfoRow = ({ icon, label, value, iconColor = "#1d4ed8" }) => (
     </View>
     <View style={rowS.content}>
       <Text style={rowS.label}>{label}</Text>
-      <Text style={rowS.value}>{value || "—"}</Text>
+      <Text style={rowS.value}>{value || "-"}</Text>
     </View>
   </View>
 );

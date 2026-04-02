@@ -149,10 +149,10 @@
               <span>Gestion Carburant</span>
               <span class="section-icon">🛢️</span>
             </div>
-            <RouterLink 
-              v-if="canManageFuel" 
-              to="/fuel/supplies" 
-              class="nav-item" 
+            <RouterLink
+              v-if="canManageFuel"
+              to="/fuel/supplies"
+              class="nav-item"
               @click="closeMenu"
               :class="{ 'active': $route.path.includes('/fuel/supplies') }"
             >
@@ -177,6 +177,21 @@
                 </svg>
               </div>
               <span class="nav-label">Ravitaillements</span>
+            </RouterLink>
+            <RouterLink
+              v-if="canManageFuel"
+              to="/reconciliations"
+              class="nav-item"
+              @click="closeMenu"
+              :class="{ 'active': $route.path.includes('/reconciliations') }"
+            >
+              <div class="nav-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 11l3 3L22 4"/>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+              </div>
+              <span class="nav-label">Rapprochements</span>
             </RouterLink>
           </div>
 
@@ -453,7 +468,7 @@ import { useSessionTimeout } from '@/composables/useSessionTimeout'
 import SessionTimeoutModal from '@/components/SessionTimeoutModal.vue'
 
 const { warning, stayConnected, logout: sessionLogout } = useSessionTimeout({
-  timeoutMs: 30 * 60 * 1000,  // 30 minutes d'inactivité
+  timeoutMs: 15 * 60 * 1000,  // 30 minutes d'inactivité
   warningMs: 60 * 1000,        // avertissement 1 minute avant
 })
 

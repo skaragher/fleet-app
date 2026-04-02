@@ -264,7 +264,7 @@ const DriverDashboardScreen = () => {
       <View style={[styles.tilesGrid, isTablet && styles.tilesGridTablet]}>
         <StatTile
           label="Conso moyenne"
-          value={avgConsumption > 0 ? `${avgConsumption.toFixed(1)}` : "—"}
+          value={avgConsumption > 0 ? `${avgConsumption.toFixed(1)}` : "-"}
           sub={avgConsumption > 0 ? `L/100km · ${consumptionState.label}` : "Non disponible"}
           icon="speedometer-outline"
           iconColor={consumptionState.color}
@@ -272,7 +272,7 @@ const DriverDashboardScreen = () => {
         />
         <StatTile
           label="Assurance"
-          value={insuranceDays !== null ? `${Math.max(0, insuranceDays)}j` : "—"}
+          value={insuranceDays !== null ? `${Math.max(0, insuranceDays)}j` : "-"}
           sub={
             insuranceDays === null
               ? "Aucune"
@@ -288,7 +288,7 @@ const DriverDashboardScreen = () => {
         />
         <StatTile
           label="Visite technique"
-          value={inspectionDays !== null ? `${Math.max(0, inspectionDays)}j` : "—"}
+          value={inspectionDays !== null ? `${Math.max(0, inspectionDays)}j` : "-"}
           sub={
             inspectionDays === null
               ? "Aucune"
@@ -322,7 +322,7 @@ const DriverDashboardScreen = () => {
               <View style={styles.dispenseInfoRow}>
                 <Ionicons name="time-outline" size={13} color="#64748b" />
                 <Text style={styles.dispenseInfo}>
-                  {formatDate(getDispenseDateValue(lastDispense))} —{" "}
+                  {formatDate(getDispenseDateValue(lastDispense))} -{" "}
                   {new Date(getDispenseDateValue(lastDispense)).toLocaleTimeString("fr-FR", {
                     hour: "2-digit",
                     minute: "2-digit",

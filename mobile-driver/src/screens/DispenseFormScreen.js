@@ -154,7 +154,7 @@ const DispenseFormScreen = ({ route, navigation }) => {
           </TouchableOpacity>
           <View style={styles.headerCenter}>
             <Text style={styles.headerLabel}>RAVITAILLEMENT</Text>
-            <Text style={styles.headerPlate}>{vehicle?.plate || "—"}</Text>
+            <Text style={styles.headerPlate}>{vehicle?.plate || "-"}</Text>
           </View>
           <View style={styles.backBtn} />
         </LinearGradient>
@@ -175,7 +175,7 @@ const DispenseFormScreen = ({ route, navigation }) => {
                 {[vehicle?.make, vehicle?.model].filter(Boolean).join(" ") || "Modèle non renseigné"}
               </Text>
               <Text style={styles.vehicleMeta}>
-                {FUEL_LABELS[vehicle?.fuelType] || vehicle?.fuelType || "—"}
+                {FUEL_LABELS[vehicle?.fuelType] || vehicle?.fuelType || "-"}
                 {" · "}
                 {vehicle?.odometerKm != null
                   ? `${Number(vehicle.odometerKm).toLocaleString()} km actuels`
@@ -187,9 +187,9 @@ const DispenseFormScreen = ({ route, navigation }) => {
           {/* ── Formulaire ─────────────────────────────────────────── */}
           <View style={styles.form}>
 
-            {/* Sélection de la cuve — filtrée par type de carburant du véhicule */}
+            {/* Sélection de la cuve - filtrée par type de carburant du véhicule */}
             <Field
-              label={`Cuve — ${FUEL_LABELS[vehicle?.fuelType] || vehicle?.fuelType || "Carburant"}`}
+              label={`Cuve - ${FUEL_LABELS[vehicle?.fuelType] || vehicle?.fuelType || "Carburant"}`}
               icon="flask-outline"
               iconColor="#0891b2"
               required

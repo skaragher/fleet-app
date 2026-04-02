@@ -25,6 +25,7 @@ import usersRoutes from "./routes/users.routes.js";
 import companySettingsRoutes from "./routes/company-settings.routes.js";
 import fuelReportsRoutes from "./routes/fuel.reports.routes.js";
 import reportsRoutes from "./routes/reports.routes.js";
+import reconciliationsRoutes from "./routes/reconciliations.routes.js";
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -161,6 +162,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/company-settings", companySettingsRoutes);
 app.use("/api/fuel/reports", fuelReportsRoutes);
 app.use("/api/reports", reportsRoutes);
+app.use("/api/reconciliations", reconciliationsRoutes);
 
 // Middleware pour les routes non trouvées
 app.use((req, res, next) => {
